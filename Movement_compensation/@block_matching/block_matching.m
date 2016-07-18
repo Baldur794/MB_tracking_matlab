@@ -13,8 +13,8 @@ classdef block_matching
     end 
     
     methods(Access = public)
-    % class constructor        
-        function [motion_y motion_x] = motion_displacement(obj, img_ref,img_new)    
+        % class constructor
+        function [motion_y motion_x] = motion_displacement(obj, img_ref,img_new)
             if strcmp(obj.cost_function, 'Corr')
                 % Matlab 2d NCC
                 c = abs(xcorr2(img_ref*10^24,img_new*10^24));
@@ -22,11 +22,11 @@ classdef block_matching
                 % Finds max correlation
                 [max_y max_x] = peak_estimation(c, 'max');
                 
-%                 % Finds max correlation
-%                 [max_y max_x] = find(c == max(c(:)));
+                %                 % Finds max correlation
+                %                 [max_y max_x] = find(c == max(c(:)));
                 motion_y = max_y(1)-size(img_new,1)-obj.max_mov_y;
                 motion_x = max_x(1)-size(img_new,2)-obj.max_mov_x;
-
+                
             elseif strcmp(obj.cost_function, 'Norm Corr')
                 % Matlab 2d NCC
                 c = (normxcorr2(img_new*10^24,img_ref*10^24));
@@ -35,19 +35,53 @@ classdef block_matching
                 % Finds peak position
                 [max_y max_x] = peak_estimation(c, 'max');
                 % Finds max correlation
-%                 [max_y max_x] = find(c == max(c(:)));
+                %                 [max_y max_x] = find(c == max(c(:)));
                 motion_y = max_y(1)-obj.max_mov_y-1;
+                motion_x = max_x(1)-obj.max_mov_x-1;
+            elseif strcmp(obj.cost_function, 'xCorr')
+                % Matlab 2d NCC
+                for i = 1:obj.max_mov_x*2+1
+                    [c(:,i) lag(:,i)] = crosscorr(img_new,img_ref(:,i),obj.max_mov_y*6);
+%                     figure();crosscorr(img_new,img_ref(:,i),obj.max_mov_y*6);
+                end
+                
+%                 -------------------------------
+%                 figure(); crosscorr(img_ref_temp,img_ref_wind,max_mov_y*6);
+%                 figure(); plot(img_ref_temp);
+%                 figure(); plot(img_ref_temp_test);
+%                 figure(); plot(img_ref_wind);
+                n = 20;
+                Wn = 0.5;
+                b = fir1(n,Wn);
+                c_filt = filter(b,1,c,[],1);
+                lag = lag(n/2:end,:)-n/2;
+                c_filt = c_filt(n/2:end,:);
+%                 figure();plot(lag,c_filt);
+%                 figure(); crosscorr(img_ref_temp,img_ref_wind,max_mov_y*2);
+%                 temp = [temp max(abs(c(:)))];
+                %             [y, x] = find((c_filt) == max((c_filt(floor((size(lag,1)+n/2)/2)+1:...
+                %                 floor((size(lag,1)+n/2)/2)+1+2*obj.max_mov_y))));
+%                 [y, x] = find((c_filt) == max(c_filt(:)));
+%                 max_y = lag(y,x)-obj.max_mov_y;
+%                 max_x = x-obj.max_mov_x-1;
+                %------------------
+
+                % Finds peak position
+                [max_y max_x] = peak_estimation(c_filt, 'max');
+                % Finds max correlation
+                %                 [max_y max_x] = find(c == max(c(:)));
+                motion_y = max_y(1)-(size(lag,1)+n/2)/2-obj.max_mov_y-1;
                 motion_x = max_x(1)-obj.max_mov_x-1;
             else
                 % Cost matrix
-                cost_matrix = zeros(size(img_ref,1)-size(img_new,1)+1,size(img_ref,2)-size(img_new,2)+1);   
-
+                cost_matrix = zeros(size(img_ref,1)-size(img_new,1)+1,size(img_ref,2)-size(img_new,2)+1);
+                
                 for i = 1:size(cost_matrix,1)
-                    for j = 1:size(cost_matrix,2)         
+                    for j = 1:size(cost_matrix,2)
                         y_start = i;
                         y_end = i+size(img_new,1)-1;
                         x_start = j;
-                        x_end = j+size(img_new,2)-1;            
+                        x_end = j+size(img_new,2)-1;
                         img_ref_temp = img_ref(y_start:y_end,x_start:x_end);
                         if strcmp(obj.cost_function, 'MAD')
                             cost_matrix(i,j) = mad(img_ref_temp, img_new);

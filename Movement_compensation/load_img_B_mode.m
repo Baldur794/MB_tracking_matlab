@@ -1,7 +1,7 @@
 function [ fore_grnd_img ] = load_img( idx_seq )
 % Outputs foreground img.
 filename = '/data/cfudata6/s134082/Bachelorprojekt/micro_bubble_data/mat_files/2016_04_21_14_32_21/frame_';
-%filepath = '/data/cfudata6/s134082/Bachelorprojekt/simulation_data/spinning_disk/Spinningdisk_0.002m_s/FIELD/bf_em_data/flow_BF_res1010_full_new/seq_';
+% filepath = '/data/cfudata6/s134082/Bachelorprojekt/simulation_data/spinning_disk/Spinningdisk_0.002m_s/FIELD/bf_em_data/flow_BF_res1010_full_new/seq_';
 
 % chosen emission
 em_idx = 1;

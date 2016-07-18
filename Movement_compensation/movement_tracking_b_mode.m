@@ -1,8 +1,18 @@
 %% Displacement RF
 
 % B_mode
-img_wind_cord =[700,900,130,150;
-                250,450,40,60];
+img_wind_cord = zeros(1,4);
+for i = 2:2
+    img_wind_cord(1,:) = [500 900 130+i 130+i];
+end
+
+% B_mode
+% img_wind_cord = zeros(1,4);
+% for i = 1:1
+%     img_wind_cord(i,:) = [190 210 370+i 370+i];
+% end
+
+%img_wind_cord(i,:) = [700 900 130 150];
 %  img_wind_cord =[200,400,40,60
 %                  200,400,125,145
 %                  750,950,130,150
@@ -29,18 +39,18 @@ img_wind_cord =[700,900,130,150;
 %                  370,390,202,202
 %                  370,390,203,203];
 
-max_mov_y = 16;
-max_mov_x = 3;
+max_mov_y = 10;
+max_mov_x = 1;
 
 fps = 50;
 frames = 250;
 n_frames_rep = 50;
-%start_frame = 103;
-start_frame_new = 100;
+start_frame = 11;
+%start_frame_new = 100;
 H = block_matching;
 H.max_mov_y = max_mov_y;
 H.max_mov_x = max_mov_x;
-H.cost_function = 'Norm Corr';
+H.cost_function = 'xCorr';
 H.img_wind_cord = img_wind_cord;
 idx_frame = 1;
 mode = 'b_mode';
@@ -53,7 +63,7 @@ for idx_wind = 1:size(img_wind_cord,1)
 end
 % Full image
 img_disp = load_img_B_mode(1);
-figure(1); clf;
+figure(5); clf;
 norm = max(abs(img_disp(:)));
 limg=20*log10(abs(img_disp)/norm);
 imagesc(limg,[-40 0]);% xlim([1 size(img,2)]); ylim([1 size(img,1)]);
@@ -82,51 +92,167 @@ tempx = zeros(2,1);
 
 % Run through all templates
 for idx_wind = 1:size(img_wind_cord,1)
-    for start_frame = start_frame_new:start_frame_new+n_frames_rep+1
+%    for start_frame = start_frame_new:start_frame_new+n_frames_rep+1
         % Load ref img
         idx_frame = start_frame;
         img_ref_wind = H.img_reference_window(idx_frame, idx_wind, mode);
         % Repeat for all frames
         for idx_frame = start_frame:start_frame+frames-1;
             %         % Load ref img
-%             img_ref_wind = H.img_reference_window(idx_frame, idx_wind, mode);
+            img_ref_wind = H.img_reference_window(idx_frame, idx_wind, mode);
             
             % Load new img
-            img_new_temp = H.img_new_template(idx_frame, idx_wind, mode);
+            img_new_temp = H.img_new_template(idx_frame+1, idx_wind, mode);
             
             [motion_y motion_x] = H.motion_displacement(img_ref_wind,img_new_temp);
             mov_y(idx_wind,idx_frame-start_frame+1) = motion_y;
             mov_x(idx_wind,idx_frame-start_frame+1) = motion_x;
         end
         
-        if any(mov_y_list(1,:))
-            [max_corr, lag] = crosscorr(mov_y,mov_y_list(1,:),60);
-            lag_index = find(max_corr == max(max_corr(ceil(size(max_corr,2)/2):end)));
-            tempy = [tempy [max(max_corr(ceil(size(max_corr,2)/2):end)); lag_index]];
-            max_displacement = lag(lag_index)
-            mov_y_list(idx_mov,max_displacement+1:end) = mov_y(1:end-max_displacement);
+%         if any(mov_y_list(1,:))
+%             [max_corr, lag] = crosscorr(mov_y,mov_y_list(1,:),60);
+%             lag_index = find(max_corr == max(max_corr(ceil(size(max_corr,2)/2):end)));
+%             tempy = [tempy [max(max_corr(ceil(size(max_corr,2)/2):end)); lag_index]];
+%             max_displacement = lag(lag_index)
+%             mov_y_list(idx_mov,max_displacement+1:end) = mov_y(1:end-max_displacement);
+%             
+%         else
+%             mov_y_list(1,:) = mov_y;
+%         end
+%         
+%         if any(mov_x_list(1,:))
+%             [max_corr, lag] = crosscorr(mov_x,mov_x_list(1,:),60);
+%             lag_index = find(max_corr == max(max_corr(ceil(size(max_corr,2)/2):end)));
+%             tempx = [tempx [max(max_corr(ceil(size(max_corr,2)/2):end)); lag_index]];
+%             max_displacement = lag(lag_index)
+%             mov_x_list(idx_mov,max_displacement+1:end) = mov_x(1:end-max_displacement);
+%             
+%         else
+%             mov_x_list(1,:) = mov_x;
+%         end
+%         
+%         idx_mov = idx_mov + 1;
+%     end
+%     mov_y = mean(mov_y_list);
+%     mov_y = mov_y(:,50:end);
+%     mov_x = mean(mov_x_list);
+%     mov_x = mov_x(:,50:end);
+end
+%% Displacement axial           
+mov_y = [];
+%mov_y_list = zeros(n_frames_rep,frames);
+%idx_mov = 1;
+%tempy = zeros(2,1);
+%tempx = zeros(2,1);
+temp = [];
+
+% Run through all templates
+for idx_wind = 1:size(img_wind_cord,1)
+%    for start_frame = start_frame_new:start_frame_new+n_frames_rep+1
+        % Load ref img
+%         idx_frame = start_frame;
+%         
+%         % Load img
+%         img_ref = real(load_img_B_mode(idx_frame));
+%         
+%         
+%         % Find coordinates
+%         y_start = img_wind_cord(idx_wind,1)-max_mov_y;
+%         y_end = img_wind_cord(idx_wind,2)+max_mov_y;
+%         x_start = img_wind_cord(idx_wind,3);
+%         x_end = img_wind_cord(idx_wind,4);
+%         
+%         % Make template window
+%         img_ref_wind = zeros(y_end-y_start+1,x_end-x_start+1);
+%         img_ref_wind = img_ref(y_start:y_end,x_start:x_end);
+%         
             
-        else
-            mov_y_list(1,:) = mov_y;
-        end
-        
-        if any(mov_x_list(1,:))
-            [max_corr, lag] = crosscorr(mov_x,mov_x_list(1,:),60);
-            lag_index = find(max_corr == max(max_corr(ceil(size(max_corr,2)/2):end)));
-            tempx = [tempx [max(max_corr(ceil(size(max_corr,2)/2):end)); lag_index]];
-            max_displacement = lag(lag_index)
-            mov_x_list(idx_mov,max_displacement+1:end) = mov_x(1:end-max_displacement);
             
-        else
-            mov_x_list(1,:) = mov_x;
+            
+%         img_ref_wind = H.img_reference_window_rf(idx_frame, idx_wind, mode);
+        % Repeat for all frames
+        for idx_frame = start_frame:start_frame+frames-1;
+            % Load ref img
+%             img_ref_wind = H.img_reference_window_rf(idx_frame, idx_wind, mode);
+
+            % Load img
+            img_ref = (real(load_img_B_mode(idx_frame)));
+                        
+            % Find coordinates
+            y_start = img_wind_cord(idx_wind,1)-max_mov_y;
+            y_end = img_wind_cord(idx_wind,2)+max_mov_y;
+            x_start = img_wind_cord(idx_wind,3);
+            x_end = img_wind_cord(idx_wind,4);
+            
+            % Make template window
+            img_ref_wind = zeros(y_end-y_start+1,x_end-x_start+1);
+            img_ref_wind = img_ref(y_start:y_end,x_start:x_end);
+
+            % Load new img
+            img_ref = (real(load_img_B_mode(idx_frame+1)));
+            
+            % Find coordinates
+            y_start = img_wind_cord(idx_wind,1);
+            y_end = img_wind_cord(idx_wind,2);
+            x_start = img_wind_cord(idx_wind,3);
+            x_end = img_wind_cord(idx_wind,4);
+            
+            % Make template window
+            img_ref_temp = zeros(y_end-y_start+1,x_end-x_start+1);
+            img_ref_temp = img_ref(y_start:y_end,x_start:x_end);
+            
+%             img_ref_temp_test = spline(linspace(1,size(img_ref_temp,1),size(img_ref_temp,1)),img_ref_temp,linspace(1,size(img_ref_temp,1),size(img_ref_temp,1)*2))
+%             img_ref_wind_test = spline(linspace(1,size(img_ref_wind,1),size(img_ref_wind,1)),img_ref_wind,linspace(1,size(img_ref_wind,1),size(img_ref_wind,1)*2))
+%             figure(); crosscorr(img_ref_temp_test,img_ref_wind_test,30);
+            [c lag] = crosscorr(img_ref_temp,img_ref_wind,max_mov_y*6);
+%             figure(); crosscorr(img_ref_temp,img_ref_wind,max_mov_y*6);
+%             figure(); plot(img_ref_temp);
+%             figure(); plot(img_ref_temp_test);
+%             figure(); plot(img_ref_wind);
+            n = 20;
+            Wn = 0.5;
+            b = fir1(n,Wn);
+            c_filt = filter(b,1,c);
+            lag = lag(n/2:end)-n/2;
+            c_filt = c_filt(n/2:end);
+%             figure();plot(lag,c_filt);
+%             figure(); crosscorr(img_ref_temp,img_ref_wind,max_mov_y*2);
+            temp = [temp max(abs(c(:)))];
+            motion_y = lag(find((c_filt) == max((c_filt(floor((size(lag,1)+n/2)/2)+1:...
+                floor((size(lag,1)+n/2)/2)+1+2*max_mov_y)))))-max_mov_y;
+%             [motion_y motion_x] = H.motion_displacement(img_ref_wind,img_new_temp);
+            mov_y(idx_wind,idx_frame-start_frame+1) = motion_y;
+%             mov_x(idx_wind,idx_frame-start_frame+1) = motion_x;
+
         end
-        
-        idx_mov = idx_mov + 1;
-    end
-    mov_y = mean(mov_y_list);
-    mov_y = mov_y(:,50:end);
-    mov_x = mean(mov_x_list);
-    mov_x = mov_x(:,50:end);
+%         if any(mov_y_list(1,:))
+%             [max_corr, lag] = crosscorr(mov_y,mov_y_list(1,:),60);
+%             lag_index = find(max_corr == max(max_corr(ceil(size(max_corr,2)/2):end)));
+%             tempy = [tempy [max(max_corr(ceil(size(max_corr,2)/2):end)); lag_index]];
+%             max_displacement = lag(lag_index)
+%             mov_y_list(idx_mov,max_displacement+1:end) = mov_y(1:end-max_displacement);
+%             
+%         else
+%             mov_y_list(1,:) = mov_y;
+%         end
+%         
+%         if any(mov_x_list(1,:))
+%             [max_corr, lag] = crosscorr(mov_x,mov_x_list(1,:),60);
+%             lag_index = find(max_corr == max(max_corr(ceil(size(max_corr,2)/2):end)));
+%             tempx = [tempx [max(max_corr(ceil(size(max_corr,2)/2):end)); lag_index]];
+%             max_displacement = lag(lag_index)
+%             mov_x_list(idx_mov,max_displacement+1:end) = mov_x(1:end-max_displacement);
+%             
+%         else
+%             mov_x_list(1,:) = mov_x;
+%         end
+%         
+%         idx_mov = idx_mov + 1;
+%     end
+%     mov_y = mean(mov_y_list);
+%     mov_y = mov_y(:,50:end);
+%     mov_x = mean(mov_x_list);
+%     mov_x = mov_x(:,50:end);
 end
 %% Calculate Veloctity (for fixed ref img)
 vel_x = [];
@@ -136,6 +262,19 @@ for idx_wind = 1:size(img_wind_cord,1)
     vel_x(idx_wind,:) = mov_x(idx_wind,2:end)-mov_x(idx_wind,1:end-1);
     vel_y(idx_wind,:) = mov_y(idx_wind,2:end)-mov_y(idx_wind,1:end-1);
     vel_abs(idx_wind,:) = sqrt(vel_x(idx_wind,:).^2+vel_y(idx_wind,:).^2);
+end
+
+%% Calculate movement (for variable ref img)
+vel_y = mov_y;
+vel_x = mov_x;
+mov_y = zeros(size(vel_y));
+mov_x = zeros(size(vel_x));
+
+for idx_wind = 1:size(img_wind_cord,1)
+    for idx_frame = start_frame:start_frame+frames-1;
+        mov_y(idx_wind,idx_frame-start_frame+1) = sum(vel_y(idx_wind,1:idx_frame-start_frame+1));
+        mov_x(idx_wind,idx_frame-start_frame+1) = sum(vel_x(idx_wind,1:idx_frame-start_frame+1));
+    end
 end 
 
 %% Calculate fft
@@ -279,10 +418,10 @@ end
 
 
 %% Displacement axial
-figure(); plot((mov_y + flipud(repmat(linspace(0,40,size(mov_y,1))',1,size(mov_y,2))))');% legend('1','2','3','4','5','6','7');
+figure(); plot((mov_y + flipud(repmat(linspace(0,100,size(mov_y,1))',1,size(mov_y,2))))');% legend('1','2','3','4','5','6','7');
 xlabel('frames (50 fps)'); ylabel('Axial displacement (mm)'); 
 title('Axial displacement');
-ylim([-5,55]);% xlim([0,40]);
+ylim([80,115]);% xlim([0,40]);
 %set(gca,'Xtick',linspace(0,100,20)); set(gca,'Xtick',linspace(0,img_size(2),4));
 %set(gca,'Ytick',linspace(17,32,5)); set(gca, 'YTickLabel',linspace(-0.2,0.2,5));
 
