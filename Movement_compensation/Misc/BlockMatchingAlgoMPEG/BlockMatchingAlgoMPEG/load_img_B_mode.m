@@ -1,0 +1,56 @@
+function [ fore_grnd_img ] = load_img( idx_seq )
+% Outputs foreground img.
+%filename = '/data/cfudata7/cavh/phantoms/microbubble/initial_try/SARUS/exp_2015.07.09_12.31/bf_em_data/flow_behind_BF_res1010/seq_';
+%filename = '/data/cfudata7/cavh/phantoms/microbubble/initial_try/SARUS/exp_2015.07.09_12.31/bf_em_data/flow_behind_BF_res1010_full_new/seq_';
+%filename = '/data/cfudata6/s134082/Bachelorprojekt/micro_bubble_data/mat_files/2016_04_21_14_06_41/frame_';
+%filename = '/data/cfudata6/s134082/Bachelorprojekt/micro_bubble_data/mat_files/2016_04_21_15_29_41/frame_';
+filename = '/data/cfudata6/s134082/Bachelorprojekt/micro_bubble_data/mat_files/2016_04_21_14_32_21/frame_';
+% chosen emission
+em_idx = 1;
+
+% img size from beamforming
+%img_size = [999,301];% flow_behind_BF_res1010
+%img_size = [4250,401];% flow_behind_BF_res1010_full_new
+%img_size = [1960,560];% B-mode 
+img_size = [1960,280];% B-mode half removed 
+%img_size = [684,123];% Contrast 
+
+% contains foreground img and background img
+fore_grnd_img = zeros(img_size);
+bck_grnd_img = zeros(img_size);
+
+% % % % % background options
+% % % n_bck_grnd = 7;% # of img's to make back ground
+% % % n_bck_grnd_skip = 1;% # of img's skipped between each background img
+% % % 
+% % % % sum of n_bck_grnd images
+% % % for i = idx_seq-n_bck_grnd_skip*n_bck_grnd:n_bck_grnd_skip:idx_seq-n_bck_grnd_skip
+% % %     %bck_grnd_img = bck_grnd_img + cell2mat(struct2cell(load([filename num2str(i,'%04d') '/em_' num2str(em_idx,'%04d') '.mat'],'bf_data')));
+% % %     load([filename num2str(i,'%d') '.mat'],'img');
+% % %     bck_grnd_img = bck_grnd_img + hilbert(img(:,1:img_size(2)));
+% % % end
+% % % % background average
+% % % bck_grnd_img = bck_grnd_img/n_bck_grnd;
+% % % 
+% % % %---------------------------
+% % % % % background options
+% % % n_fore_grnd = 7;% # of img's to make back ground
+% % % n_fore_grnd_skip = 43;% # of img's skipped between each background img
+% % % 
+% % % 
+% % % % sum of n_fore_grnd images
+% % % for i = idx_seq-n_fore_grnd_skip*n_fore_grnd:n_fore_grnd_skip:idx_seq-n_fore_grnd_skip
+% % %     %fore_grnd_img = fore_grnd_img + cell2mat(struct2cell(load([filename num2str(i,'%04d') '/em_' num2str(em_idx,'%04d') '.mat'],'bf_data')));
+% % %     load([filename num2str(i,'%d') '.mat'],'img');
+% % %     fore_grnd_img = fore_grnd_img + hilbert(img(:,1:img_size(2)));
+% % % end
+% % % % foreground average
+% % % fore_grnd_img = fore_grnd_img/n_fore_grnd;
+% % % %-------------------------------
+
+% foreground from present frame subtracted the background
+load([filename num2str(idx_seq,'%d') '.mat']);
+fore_grnd_img = (hilbert(img(:,1:img_size(2))));
+%fore_grnd_img = fore_grnd_img-bck_grnd_img; %(hilbert(img(:,1:img_size(2)))-bck_grnd_img);% - bck_grnd_img;
+end
+

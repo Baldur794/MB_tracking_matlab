@@ -1,0 +1,450 @@
+%Log compression
+log_compression = @(x) 20*log10(x/max(x(:)));
+
+% Folder path
+foldername ='/data/cfudata7/cavh/phantoms/microbubble/initial_try/SARUS/exp_2015.07.09_12.31';
+addpath('../'); % for show_img.m
+
+% MB_data structure
+MB_data_state = 1; MB_data_old_pos_x = 2; MB_data_old_pos_y = 3; MB_data_new_pos_x = 4; MB_data_new_pos_y = 5; MB_data_vel_x = 6; MB_data_vel_y = 7; MB_data_int = 8; MB_data_age = 9; MB_data_id = 10;
+
+% MB_movement structure
+MB_movement_old_pos_x = 1; MB_movement_old_pos_y = 2; MB_movement_vel_x = 3; MB_movement_vel_y = 4;    
+
+% Color matrix for plot
+color_plot = [0    0.4470    0.7410
+                0.8500    0.3250    0.0980
+                0.9290    0.6940    0.1250
+                0.4940    0.1840    0.5560
+                0.4660    0.6740    0.1880
+                0.3010    0.7450    0.9330
+                0.6350    0.0780    0.1840];
+
+
+%% Known parameters  %%
+% Axial parameters %
+start_depth= 0.0215; % Starting depth to beamform [meters]
+dr_depth = 2.325531250000000e-05; % Original resolution on the depth axis
+end_depth= start_depth + 1827*dr_depth;   % Ending depth to beamform [meters]
+
+% Lateral parameters %
+start_lateral = -0.0190;  % Start with leftmost element
+dr_lateral = 1.488281250000001e-04; % Original resolution on the lateral axis
+end_lateral = start_lateral + 257*dr_lateral; % End with rightmost element
+
+% Frame rate seq -> seq
+frames_rate = 1000/6; % Emission freq = 1kHz
+
+%% Load data files into rf_img
+idx_seq = 1; % Start seq folder
+em_idx = 1; % Emission chosen
+start_idx_seq = 30;%150;%30;
+end_idx_seq = 150;%270;%150; 
+rf_img = zeros(1827,257,end_idx_seq-start_idx_seq); % Array to contain img's
+
+crop_coord_top = 28*10^(-3);
+crop_coord_bot = 37*10^(-3);
+crop_coord_left = -8.5*10^(-3);
+crop_coord_right = -6*10^(-3);
+% 
+% crop_coord_top = start_depth;
+% crop_coord_bot = end_depth;
+% crop_coord_left = start_lateral;
+% crop_coord_right = end_lateral;
+
+crop_coord = [round((crop_coord_top-start_depth)/dr_depth)+1 round((crop_coord_left-start_lateral)/dr_lateral+1);
+              round((crop_coord_bot-start_depth)/dr_depth) round((crop_coord_right-start_lateral)/dr_lateral)];
+rf_img_cropped = zeros(crop_coord(2,1)-crop_coord(1,1)+1,crop_coord(2,2)-crop_coord(1,2)+1);
+
+
+for idx_seq = start_idx_seq:end_idx_seq
+    filename = [foldername '/bf_em_data/flow_behind_BF/seq_' num2str(idx_seq,'%04d') '/em_' num2str(em_idx,'%04d') '.mat'];  
+    load(filename)
+    rf_img(:,:,idx_seq - start_idx_seq+1) = bf_data;
+    rf_img_cropped(:,:,idx_seq - start_idx_seq+1) = bf_data(crop_coord(1,1):crop_coord(2,1),crop_coord(1,2):crop_coord(2,2));
+end
+
+% Log compress all rf_img
+% compressed_data=log_compression(abs(rf_img));
+abs_data = abs(rf_img);
+abs_data_cropped = abs(rf_img_cropped); 
+
+%% Background / Foreground img
+fore_grnd_img = [];
+for idx_seq = 1:60
+    % Background
+    n_bck_grnd = 5; % # of img's to make back ground
+    n_bck_grnd_skip = 10; % # of img's skipped between each background img
+    bck_grnd_img = sum(abs_data_cropped(:,:,n_bck_grnd_skip+idx_seq:n_bck_grnd_skip:n_bck_grnd*n_bck_grnd_skip+idx_seq),3)/n_bck_grnd; 
+
+    %show_img(bck_grnd_img, min(bck_grnd_img(:)), max(bck_grnd_img(:)));
+    %figure, imagesc(bck_grnd_img), colormap(gray);
+    
+    % Foreground
+    n_fore_grnd = 1; % # of img's used for speckel noise removal
+    temp_current_img = sum(abs_data_cropped(:,:,n_bck_grnd*n_bck_grnd_skip+n_bck_grnd_skip+idx_seq-1: ...
+                n_bck_grnd*n_bck_grnd_skip+n_bck_grnd_skip+idx_seq + n_fore_grnd-2),3) /(n_fore_grnd); % current img consisting of avg of "n_fore_grnd_noise_removel" images
+    
+    %show_img(temp_current_img, -80, -60);
+    %figure, imagesc(temp_current_img), colormap(gray);
+    
+    fore_grnd_img(:,:,idx_seq) = temp_current_img-bck_grnd_img; % final foreground img
+    %show_img(fore_grnd_img(:,:,idx_seq), 5, 20);
+    %figure, imagesc(fore_grnd_img(:,:,idx_seq)), colormap(gray);
+    
+end
+
+%% Script to gain info about MB by visuel inspection.
+MB_array = []; % contains all chosen squares
+MB_size_array = []; % list of all chosen square sizes
+MB_list = [] % list of all MB values 
+
+k = 0;
+idx_seq = 1
+while k == 0 % repeat until keyboard click
+    %figure, imagesc(abs_data_cropped(:,:,idx_seq)), colormap(gray); % display the respective img
+    figure, imagesc(fore_grnd_img(:,:,idx_seq),[100 500]), colormap(gray); % display the respective img
+    zoom on; % makes zoom available
+    pause()
+    zoom off; 
+    
+    MB_square_coord = round(ginput(2)); % contains top left/buttom right coordinates of chosen square
+    %MB_square = abs_data_cropped(MB_square_coord(1,2):MB_square_coord(2,2),MB_square_coord(1,1):MB_square_coord(2,1),idx_seq); % extract the square within the chosen coordinates
+    MB_square = fore_grnd_img(MB_square_coord(1,2):MB_square_coord(2,2),MB_square_coord(1,1):MB_square_coord(2,1),idx_seq); % extract the square within the chosen coordinates
+    MB_size_array = [MB_size_array;[size(MB_square,1),size(MB_square,2)]];
+    MB_array(1:size(MB_square,1),1:size(MB_square,2),size(MB_array,3)+1) = MB_square;
+    MB_list(size(MB_list,1)+1:size(MB_list,1)+size(MB_square,1)*size(MB_square,2)) = MB_square(:);  
+    
+    k = waitforbuttonpress; % mouse click -> 0, keyboard click -> 1
+    close
+    idx_seq = idx_seq + 5;
+end
+MB_array(:,:,1) = [];
+
+
+%% Script to manually track by visuel inspection.
+MB_data = zeros(1,10); % Contains information about every MB (MB_index X MB parameter)
+MB_movement = zeros(1,4,1); % Contains all coordinates of MB (MB_index X MB movement X movement log)
+MB_data_index = 1; % index for each MB
+
+k = 0;
+idx_seq = 3;
+while k == 0 % repeat until keyboard click
+    %figure, imagesc(abs_data_cropped(:,:,idx_seq)), colormap(gray); % display the respective img
+    figure, imagesc(fore_grnd_img(:,:,idx_seq),[200 500]), colormap(gray);
+    zoom on; % makes zoom available
+    pause()
+    zoom off;    
+    
+    MB_square_center = round(ginput(1)); % contains top left/buttom right coordinates of chosen square
+    MB_data(MB_data_index,MB_data_old_pos_x) = MB_data(MB_data_index,MB_data_new_pos_x); 
+    MB_data(MB_data_index,MB_data_old_pos_y) = MB_data(MB_data_index,MB_data_new_pos_y); 
+    MB_data(MB_data_index,MB_data_new_pos_x) = MB_square_center(1);
+    MB_data(MB_data_index,MB_data_new_pos_y) = MB_square_center(2);
+    MB_data(MB_data_index,MB_data_vel_x) = MB_data(MB_data_index,MB_data_new_pos_x)-MB_data(MB_data_index,MB_data_old_pos_x);
+    MB_data(MB_data_index,MB_data_vel_y) = MB_data(MB_data_index,MB_data_new_pos_y)-MB_data(MB_data_index,MB_data_old_pos_y);
+    MB_data(MB_data_index,MB_data_age) = MB_data(MB_data_index,MB_data_age) + 1;
+    MB_data(MB_data_index,MB_data_id) = 1;
+    MB_movement(MB_data(MB_data_index,MB_data_id),:,MB_data(MB_data_index,MB_data_age)) = MB_data(MB_data_index,[MB_data_old_pos_x,MB_data_old_pos_y,MB_data_vel_x,MB_data_vel_y]);
+    k = waitforbuttonpress; % mouse click -> 0, keyboard click -> 1
+
+    close
+    idx_seq = idx_seq + 3
+end
+MB_movement(MB_data_index,:,1) = 0;
+
+%% Vector plot for manually tracking
+% Correct axis:
+MB_movement(:,MB_movement_old_pos_x,:) = MB_movement(:,MB_movement_old_pos_x,:)*dr_lateral*1000+crop_coord_left*1000;
+MB_movement(:,MB_movement_old_pos_y,:) = MB_movement(:,MB_movement_old_pos_y,:)*dr_depth*1000+crop_coord_top*1000;
+MB_movement(:,MB_movement_vel_x,:) = MB_movement(:,MB_movement_vel_x,:)*dr_lateral*1000;
+MB_movement(:,MB_movement_vel_y,:) = MB_movement(:,MB_movement_vel_y,:)*dr_depth*1000;
+
+%%
+MB_data_index = 1;
+MB_data_index = 2;
+figure(1);
+hold on
+vector_plot = quiver(MB_movement(MB_data_index,MB_movement_old_pos_x,:),MB_movement(MB_data_index,MB_movement_old_pos_y,:),MB_movement(MB_data_index,MB_movement_vel_x,:),MB_movement(MB_data_index,MB_movement_vel_y,:),'Color',color_plot(mod(MB_data_index,size(color_plot,1))+1,:)); 
+xlim([crop_coord_left*1000 crop_coord_right*1000]); ylim([crop_coord_top*1000 crop_coord_bot*1000]);
+vector_plot.AutoScale = 'off';
+vector_plot.MaxHeadSize = 0.1;
+vector_plot.ShowArrowHead = 'on';
+xlabel('Lateral distance x [mm]')
+ylabel('Depth z [mm]')
+legend('Manual','Auto')
+set(gca,'YDir','reverse');
+set(gca,'Box','on');
+hold off
+%%
+figure;
+vector_plot = quiver(MB_movement(1,MB_movement_old_pos_x,:),MB_movement(1,MB_movement_old_pos_y,:),MB_movement(1,MB_movement_vel_x,:),MB_movement(1,MB_movement_vel_y,:),'Color',color_plot(mod(MB_data_index,size(color_plot,1))+1,:)); 
+xlim([0 17]); ylim([0 388]);
+vector_plot.AutoScale = 'off';
+vector_plot.MaxHeadSize = 0.01;
+vector_plot.ShowArrowHead = 'on';
+set(gca,'YDir','reverse');
+
+%% Track algorithm
+% initialize MB_data containing all information about all MB
+MB_data = zeros(1,10); % Contains information about every MB (MB_index X MB parameter)
+MB_movement = zeros(1,4,1); % Contains all coordinates of MB (MB_index X MB movement X movement log)
+
+MB_window_size = [30 4]; % half search window size
+MB_window_coord = zeros(2,2); % coordinates of search window
+MB_data_index = 1; % index for each MB
+
+threshold = 200;
+idx_seq = 1; % frame index
+
+fore_grnd_img(find(fore_grnd_img < threshold)) = 0; % sets all values below threshold to zero
+fore_grnd_img_temp = fore_grnd_img(:,:,idx_seq); % creates a temporary img
+
+
+% Startup:
+% find max intensity and its coordinates
+while any(fore_grnd_img_temp(:))
+    % find max intensity and its coordinates
+    [max_int, max_index] = max(fore_grnd_img_temp(:));
+    [max_y, max_x] = ind2sub([size(fore_grnd_img_temp,1),size(fore_grnd_img_temp,2)], max_index);
+    
+    % Update window coordinates
+    MB_window_coord(1,1) = max_y-MB_window_size(1);
+    MB_window_coord(2,1) = max_y+MB_window_size(1);
+    MB_window_coord(1,2) = max_x-MB_window_size(2);
+    MB_window_coord(2,2) = max_x+MB_window_size(2);
+    
+    % check for out of bounce
+    % y1
+    if MB_window_coord(1,1) <= 0
+        MB_window_coord(1,1) = 1;
+    end
+    % y2
+    if MB_window_coord(2,1) > size(fore_grnd_img_temp,1)
+        MB_window_coord(2,1) = size(fore_grnd_img_temp,1);
+    end
+    % x1
+    if MB_window_coord(1,2) <= 0
+        MB_window_coord(1,2) = 1;
+    end
+    % x2
+    if MB_window_coord(2,2) > size(fore_grnd_img_temp,2)
+        MB_window_coord(2,2) = size(fore_grnd_img_temp,2);
+    end
+    
+    % ----------
+    %figure, imagesc(fore_grnd_img_temp(:,:),[200 500]), colormap(gray);
+    %-----------
+    
+    % set all to zero within search area
+    fore_grnd_img_temp(MB_window_coord(1,1):MB_window_coord(2,1),MB_window_coord(1,2):MB_window_coord(2,2)) = 0;
+    
+    % update MB data
+    MB_data(MB_data_index,MB_data_state) = 1;
+    MB_data(MB_data_index,MB_data_new_pos_x) = max_x; 
+    MB_data(MB_data_index,MB_data_new_pos_y) = max_y;
+    MB_data(MB_data_index,MB_data_int) = max_int;
+    MB_data(MB_data_index,MB_data_age) = MB_data(MB_data_index,MB_data_age) + 1;
+    MB_data(MB_data_index,MB_data_id) = max(MB_data(:,MB_data_id)) + 1;
+    MB_data_index = MB_data_index + 1;
+end
+
+% after startup
+for idx_seq = 3:3:size(fore_grnd_img,3)
+    fore_grnd_img_temp = fore_grnd_img(:,:,idx_seq);
+    MB_data_index = 1;
+    
+    % Search for movement of exiting MB's
+    while MB_data_index <= size(MB_data,1)
+        % Update window coordinates
+        MB_window_coord(1,1) = MB_data(MB_data_index,MB_data_new_pos_y)-MB_window_size(1);
+        MB_window_coord(2,1) = MB_data(MB_data_index,MB_data_new_pos_y)+MB_window_size(1);
+        MB_window_coord(1,2) = MB_data(MB_data_index,MB_data_new_pos_x)-MB_window_size(2);
+        MB_window_coord(2,2) = MB_data(MB_data_index,MB_data_new_pos_x)+MB_window_size(2);
+
+        % check for out of bounce
+        % y1
+        if MB_window_coord(1,1) <= 0
+            MB_window_coord(1,1) = 1;
+        end
+        % y2
+        if MB_window_coord(2,1) > size(fore_grnd_img_temp,1)
+            MB_window_coord(2,1) = size(fore_grnd_img_temp,1);
+        end
+        % x1
+        if MB_window_coord(1,2) <= 0
+            MB_window_coord(1,2) = 1;
+        end
+        % x2
+        if MB_window_coord(2,2) > size(fore_grnd_img_temp,2)
+            MB_window_coord(2,2) = size(fore_grnd_img_temp,2);
+        end
+
+        % window around the respective MB
+        fore_grnd_img_temp_window = fore_grnd_img_temp(MB_window_coord(1,1):MB_window_coord(2,1),MB_window_coord(1,2):MB_window_coord(2,2));
+
+        % check if any MB is within search area
+        if any(fore_grnd_img_temp_window(:))
+            % find max intensity and its coordinates
+            [max_int, max_index] = max(fore_grnd_img_temp_window(:));
+            [max_y, max_x] = ind2sub([size(fore_grnd_img_temp_window,1),size(fore_grnd_img_temp_window,2)], max_index);
+            
+            % ----------
+            %figure, imagesc(fore_grnd_img_temp(:,:),[200 500]), colormap(gray);
+            %-------------
+            
+            % set all to zero within search area
+            fore_grnd_img_temp(MB_window_coord(1,1):MB_window_coord(2,1),MB_window_coord(1,2):MB_window_coord(2,2)) = 0;
+
+            % Update MB_data
+            MB_data(MB_data_index,MB_data_old_pos_x) = MB_data(MB_data_index,MB_data_new_pos_x); 
+            MB_data(MB_data_index,MB_data_old_pos_y) = MB_data(MB_data_index,MB_data_new_pos_y); 
+            MB_data(MB_data_index,MB_data_new_pos_x) = MB_window_coord(1,2) + max_x - 1; 
+            MB_data(MB_data_index,MB_data_new_pos_y) = MB_window_coord(1,1) + max_y - 1;
+            MB_data(MB_data_index,MB_data_vel_x) = MB_data(MB_data_index,MB_data_new_pos_x)-MB_data(MB_data_index,MB_data_old_pos_x);
+            MB_data(MB_data_index,MB_data_vel_y) = MB_data(MB_data_index,MB_data_new_pos_y)-MB_data(MB_data_index,MB_data_old_pos_y);
+            MB_data(MB_data_index,MB_data_int) = max_int;
+            MB_data(MB_data_index,MB_data_age) = MB_data(MB_data_index,MB_data_age) + 1;
+            
+            % log movement of MB
+            MB_movement(MB_data(MB_data_index,MB_data_id),:,idx_seq) = MB_data(MB_data_index,[MB_data_old_pos_x,MB_data_old_pos_y,MB_data_vel_x,MB_data_vel_y]);
+            
+            MB_data_index = MB_data_index + 1;
+        else
+            % Remove MB
+            MB_data(MB_data_index,:) = [];
+        end
+        % Check next MB
+    end
+% New MB's
+    % Seach for new MB's
+    while any(fore_grnd_img_temp(:))
+        % find max intensity and its coordinates
+        [max_int, max_index] = max(fore_grnd_img_temp(:));
+        [max_y, max_x] = ind2sub([size(fore_grnd_img_temp,1),size(fore_grnd_img_temp,2)], max_index);
+
+        % Update search window coordinates
+        MB_window_coord(1,1) = max_y-MB_window_size(1);
+        MB_window_coord(2,1) = max_y+MB_window_size(1);
+        MB_window_coord(1,2) = max_x-MB_window_size(2);
+        MB_window_coord(2,2) = max_x+MB_window_size(2);
+
+        % check for out of bounce
+        % y1
+        if MB_window_coord(1,1) <= 0
+            MB_window_coord(1,1) = 1;
+        end
+        % y2
+        if MB_window_coord(2,1) > size(fore_grnd_img_temp,1)
+            MB_window_coord(2,1) = size(fore_grnd_img_temp,1);
+        end
+        % x1
+        if MB_window_coord(1,2) <= 0
+            MB_window_coord(1,2) = 1;
+        end
+        % x2
+        if MB_window_coord(2,2) > size(fore_grnd_img_temp,2)
+            MB_window_coord(2,2) = size(fore_grnd_img_temp,2);
+        end
+
+        % ----------
+        %figure, imagesc(fore_grnd_img_temp(:,:),[200 500]), colormap(gray);
+        %-------------
+       
+        % set all to zero within search area
+        fore_grnd_img_temp(MB_window_coord(1,1):MB_window_coord(2,1),MB_window_coord(1,2):MB_window_coord(2,2)) = 0;
+
+        %figure, imagesc(fore_grnd_img_temp(:,:),[200 500]), colormap(gray);
+
+        % update MB data
+        MB_data(MB_data_index,MB_data_state) = 1;
+        MB_data(MB_data_index,MB_data_new_pos_x) = max_x; 
+        MB_data(MB_data_index,MB_data_new_pos_y) = max_y;
+        MB_data(MB_data_index,MB_data_int) = max_int;
+        MB_data(MB_data_index,MB_data_age) = MB_data(MB_data_index,MB_data_age) + 1;
+        MB_data(MB_data_index,MB_data_id) = max(MB_data(:,MB_data_id)) + 1;
+        MB_data_index = MB_data_index + 1;
+    end
+
+    % sort MB's after intensity
+    [~,MB_sort_index] = sort([MB_data(:,MB_data_int)],'descend');
+    MB_data = MB_data(MB_sort_index,:);
+end
+
+%% Plot of tracking
+
+%% Individual plots
+for MB_data_index = 1:size(MB_movement,1);
+    figure;
+    vector_plot = quiver(MB_movement(MB_data_index,MB_movement_old_pos_x,:),MB_movement(MB_data_index,MB_movement_old_pos_y,:),MB_movement(MB_data_index,MB_movement_vel_x,:),MB_movement(MB_data_index,MB_movement_vel_y,:),'Color',color_plot(mod(MB_data_index,size(color_plot,1))+1,:)); 
+    xlim([0 17]); ylim([0 388]);
+    vector_plot.AutoScale = 'off';
+    vector_plot.MaxHeadSize = 0.01;
+    vector_plot.ShowArrowHead = 'on';
+    set(gca,'YDir','reverse');
+end
+
+%% Complete plot
+figure;
+hold on;
+for MB_data_index = 1:size(MB_movement,1);
+    vector_plot = quiver(MB_movement(MB_data_index,MB_movement_old_pos_x,:),MB_movement(MB_data_index,MB_movement_old_pos_y,:),MB_movement(MB_data_index,MB_movement_vel_x,:),MB_movement(MB_data_index,MB_movement_vel_y,:),'Color',color_plot(mod(MB_data_index,size(color_plot,1))+1,:)); 
+    xlim([0 17]); ylim([0 388]);
+    %xlim([0 257]); ylim([0 1827]);
+    vector_plot.AutoScale = 'off';
+    vector_plot.MaxHeadSize = 0.01;
+    vector_plot.ShowArrowHead = 'on';
+    set(gca,'YDir','reverse');
+end
+hold off
+
+%%
+figure(2);
+hold on;
+for MB_data_index = 2%1:size(MB_movement,1);
+    vector_plot = quiver(MB_movement(MB_data_index,MB_movement_old_pos_x,:),MB_movement(MB_data_index,MB_movement_old_pos_y,:),MB_movement(MB_data_index,MB_movement_vel_x,:),MB_movement(MB_data_index,MB_movement_vel_y,:),'Color',color_plot(mod(MB_data_index,size(color_plot,1))+1,:)); 
+    xlim([0 17]); ylim([0 388]);
+    %xlim([0 257]); ylim([0 1827]);
+    %xlim([crop_coord_left*1000 crop_coord_right*1000]); ylim([crop_coord_top*1000 crop_coord_bot*1000]);
+    vector_plot.AutoScale = 'off';
+    vector_plot.MaxHeadSize = 0.01;
+end
+set(gca,'YDir','reverse');
+xlabel('Lateral distance x [mm]')
+ylabel('Depth z [mm]')
+set(gca,'Box','on');
+hold off
+%%
+figure(1);
+hold on
+vector_plot = quiver(MB_movement(MB_data_index,MB_movement_old_pos_x,:),MB_movement(MB_data_index,MB_movement_old_pos_y,:),MB_movement(MB_data_index,MB_movement_vel_x,:),MB_movement(MB_data_index,MB_movement_vel_y,:),'Color',color_plot(mod(MB_data_index,size(color_plot,1))+1,:)); 
+xlim([crop_coord_left*1000 crop_coord_right*1000]); ylim([crop_coord_top*1000 crop_coord_bot*1000]);
+vector_plot.AutoScale = 'off';
+vector_plot.MaxHeadSize = 0.1;
+vector_plot.ShowArrowHead = 'on';
+xlabel('Lateral distance x [mm]')
+ylabel('Depth z [mm]')
+legend('Manual','Auto')
+set(gca,'YDir','reverse');
+set(gca,'Box','on');
+hold off
+
+%% Create film
+outputVideo=VideoWriter('MB_video.avi');
+outputVideo.FrameRate=4;
+open(outputVideo);
+
+nframe=60;
+mov(1:nframe)= struct('cdata',[],'colormap',[]);
+%set(gca,'nextplot','replacechildren')
+for k=2:nframe
+  hAx = imagesc([crop_coord_left crop_coord_right]*1000,[crop_coord_top crop_coord_bot]*1000, fore_grnd_img(:,:,k),[200 500]), colormap(gray);
+  %colormap(gray)
+  %xlabel('Lateral distance x [mm]')
+  %ylabel('Depth z [mm]')
+  mov=getframe(gcf);
+  writeVideo(outputVideo,mov.cdata);
+end
+close(gcf)
+close(outputVideo);
+%movie2avi(mov, 'MB_video', 'compression', 'None');
