@@ -54,9 +54,11 @@ classdef block_matching
                 Wn = 0.5;
                 b = fir1(n,Wn);
                 c_filt = filter(b,1,c,[],1);
-                lag = lag(n/2:end,:)-n/2;
-                c_filt = c_filt(n/2:end,:);
-%                 figure();plot(lag,c_filt);
+                c_filt = c_filt(n/2+1:end,:);
+                c_filt = c_filt(floor(size(c,1)/2)+1:floor(size(c,1)/2)+1+2*obj.max_mov_y,:);                
+                lag_filt = lag(n/2+1:end,:)-n/2;
+                lag_filt = lag_filt(floor(size(c,1)/2)+1:floor(size(c,1)/2)+1+2*obj.max_mov_y,:); 
+%                 figure();plot(lag_filt,c_filt);
 %                 figure(); crosscorr(img_ref_temp,img_ref_wind,max_mov_y*2);
 %                 temp = [temp max(abs(c(:)))];
                 %             [y, x] = find((c_filt) == max((c_filt(floor((size(lag,1)+n/2)/2)+1:...
@@ -70,7 +72,7 @@ classdef block_matching
                 [max_y max_x] = peak_estimation(c_filt, 'max');
                 % Finds max correlation
                 %                 [max_y max_x] = find(c == max(c(:)));
-                motion_y = max_y(1)-(size(lag,1)+n/2)/2-obj.max_mov_y-1;
+                motion_y = max_y(1)-obj.max_mov_y-1;
                 motion_x = max_x(1)-obj.max_mov_x-1;
             else
                 % Cost matrix

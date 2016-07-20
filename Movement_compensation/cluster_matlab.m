@@ -24,21 +24,21 @@ job = createJob(sched);
 % /home/username/Documents/MATLAB/startup.m
 
 %%
-[X,Y] = meshgrid(25:40:185,150:700:1550);
+[X,Y] = meshgrid(15:20:175,250:100:1650);
 
-max_mov_y = 16;
-max_mov_x = 3;
-wind_size_y = 200;
-wind_size_x = 20;
-
+wind_size_y = 400;
+wind_size_x = 0;
+rep_x = 5;
 img_wind_cord = zeros(length(X(:)),4);
 for i = 1:length(X(:))
-    img_wind_cord(i,:) =[Y(i)-wind_size_y/2,Y(i)+wind_size_y/2,X(i)-wind_size_x/2,X(i)+wind_size_x/2];
+    for j = 1:rep_x
+        img_wind_cord((i-1)*rep_x+j,:) =[Y(i)-wind_size_y/2,Y(i)+wind_size_y/2,X(i)-wind_size_x/2-(floor(rep_x/2)+1)+j,X(i)+wind_size_x/2-(floor(rep_x/2)+1)+j];
+    end
 end
-tasks = length(X(:));
+tasks = size(img_wind_cord,1);
 for i=1:tasks
     disp(sprintf('Task:%d',i))
-    createTask(job, @movement_tracking_b_mode_func, 3, {img_wind_cord(i,:), 1});
+    createTask(job, @movement_tracking_b_mode_func, 3, {img_wind_cord(i,:), i});
 end
 
 %%
@@ -55,6 +55,7 @@ wait(job);
 for i=1:tasks
     data{i}=job.Tasks(i,1).OutputArguments;
 end
+%%
 % Clean the directory, this can be done at the end of your code whenever
 % you don't need to assign anymore tasks to that specific job. Otherwise
 % you still can assign new tasks to this job and run them on the cluster
@@ -64,11 +65,12 @@ destroy(job);
 %  calculated on your local machine                                      %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%
-mov_y = [];
-mov_x = [];
+vel_y = [];
+vel_x = [];
 for i = 1:tasks
-    mov_y(i,:) = data{1,i}{1,1}{1};
-    mov_x(i,:) = data{1,i}{1,1}{2};
+    vel_y(i,:) = data{1,i}{1,1}{1};
+    vel_x(i,:) = data{1,i}{1,1}{2};
+    data{1,i}{1,1}{3}
 end
 
 
@@ -102,6 +104,6 @@ hold on
 scatter_img = scatter(X(:),Y(:))
 set(scatter_img,'SizeData', 50); % size of dots
 set(scatter_img,'MarkerFacecolor','flat'); % appearance of dots
-for i = 1:15
-    text(X(i)-3,Y(i)-35, int2str(i),'Color','r','FontSize',15,'FontWeight','bold');
-end
+% for i = 1:15
+%     text(X(i)-3,Y(i)-35, int2str(i),'Color','r','FontSize',15,'FontWeight','bold');
+% end
