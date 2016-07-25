@@ -2,24 +2,34 @@
 MB_window_coord_search = zeros(2,2); % Coordinates for search window
 MB_window_coord_search_clear = zeros(2,2); % Coordinates for search clear window
 
-MB_window_size_search_localization = [5 5]; % [y,x] Search window for localization of PSF's
-MB_window_size_search_new = [5 5]; % [y,x] Search window for new MB's
+MB_window_size_search_localization = [7 7]; % [y,x] Search window for localization of PSF's
+MB_window_size_search_new = [10 10]; % [y,x] Search window for new MB's
 MB_window_size_search_existing = [5 5]; % [y,x] Search window for ''old'' MB's
 MB_window_size_search_clear = MB_window_size_search_new;%[7 7]; % [y,x] Search window for ''old'' MB's
 
 
-MB_age_condition = 0;
+MB_age_condition = 5;
 MB_window_threshold = 2; % Window Threshold (actual MB_window_threshold = Max_intensity*1/threshold)
 weighing_factor = 1; % Distance weighing factor
 weighing_filter_radius = 3; % Radius around centroid to be considered
 
 MB_window_out_of_bounce = 0; % Checks if search windows is outside image
 
-nframe = 19;
+nframe = 20;
 idx_frame_start = 1;
 img_size = [630,600];
 
 filepath = '/data/cfudata6/s134082/Bachelorprojekt/simulation_data/ali/RowData_Npoints_200_Time_';
+
+% Create annular structuring element for inner marking segmentation
+radius_inner = 5;
+radius_outer = 8;
+center = radius_outer+1;
+[W,H] = meshgrid(1:2*radius_outer+1,1:2*radius_outer+1);
+strel_ring = (sqrt((W-center).^2 + (H-center).^2) <= radius_outer) & (sqrt((W-center).^2 + (H-center).^2) >= radius_inner); 
+
+% Create structuring element for erosion of small individual pixes
+strel_small_ring = strel('disk',1);
 
 
 %%
@@ -38,22 +48,44 @@ MB_log = MB;
 
 
 tic
-for idx_frame=idx_frame_start:idx_frame_start+nframe
+for idx_frame=idx_frame_start:idx_frame_start+nframe-1
     idx_frame
     % Load img
     load([filepath num2str(idx_frame,'%d') '.mat']);
     img = abs(im_mv);
-    %figure(); imagesc(img); colormap('gray');%--- 
+    %figure(); imagesc(img); colormap('gray');%---  
     
-    global_threshold = max(img(:)/2);
+    % inner maker image
+    % dilate
+    img_inner_marker_dilate = imdilate(img,strel_ring);
+%     figure(); imagesc(img_inner_marker_dilate); colormap('gray');%---
     
-    % Threshold
-    img_global_threshold = img;
-    img_global_threshold(img_global_threshold < global_threshold) = 0;
-    %figure(); imagesc(img_global_threshold); colormap('gray');%--- 
+    % logical pointwise lowest identifier
+    pointwise_mask = (img_inner_marker_dilate > img);
+%     figure(); imagesc(pointwise_mask); colormap('gray');%---
     
-    % blob labeling from threshold img
-    [img_blob_label_global,blob_count_global] = bwlabel(img_global_threshold,4);
+    % pointwise lowest
+    img_inner_pointwise_lowest = img.*pointwise_mask + img_inner_marker_dilate.*(~pointwise_mask);
+%     figure(); imagesc(img_inner_pointwise_lowest); colormap('gray');%---
+    
+    % (original - pointwise lowest)
+    img_inner_markers_pointwise_lowest = img-img_inner_pointwise_lowest;
+%     figure(); imagesc(img_inner_markers_pointwise_lowest); colormap('gray');%---
+    
+    % erosion of small blobs by opening
+    img_inner_markers_open = img_inner_markers_pointwise_lowest; %imopen(img_inner_markers_pointwise_lowest,strel_small_ring);
+%     figure(); imagesc(img_inner_markers_open); colormap('gray');%---
+    
+    % inner markers with original values
+    img_inner_markers_global = img.* (img_inner_markers_open > 0);
+%     figure(); imagesc(img_inner_markers_global); colormap('gray');%---
+    
+    % blob labeling of inner markers
+    [img_blob_label_global,blob_count_inner_marker] = bwlabel(img_inner_markers_global,4);
+%     figure(); imagesc(img_blob_label_global); colormap('gray');%---
+    
+    
+    
     
     % Sort MB's after intensity
     MB_sort_index = logical([MB.state]);
@@ -64,17 +96,17 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
         MB_index = MB_sort_index(i);
        
         % Update window coordinates
-        if MB(MB_index).age(3) == 1
+%         if MB(MB_index).age(3) == 1
             MB_window_coord_search(1,1) = MB(MB_index).new_pos(1)-MB_window_size_search_new(1);
             MB_window_coord_search(2,1) = MB(MB_index).new_pos(1)+MB_window_size_search_new(1);
             MB_window_coord_search(1,2) = MB(MB_index).new_pos(2)-MB_window_size_search_new(2);
             MB_window_coord_search(2,2) = MB(MB_index).new_pos(2)+MB_window_size_search_new(2);
-        else
-            MB_window_coord_search(1,1) = MB(MB_index).new_pos(1)-MB_window_size_search_existing(1)+MB(MB_index).vel(1);
-            MB_window_coord_search(2,1) = MB(MB_index).new_pos(1)+MB_window_size_search_existing(1)+MB(MB_index).vel(1);
-            MB_window_coord_search(1,2) = MB(MB_index).new_pos(2)-MB_window_size_search_existing(2)+MB(MB_index).vel(2);
-            MB_window_coord_search(2,2) = MB(MB_index).new_pos(2)+MB_window_size_search_existing(2)+MB(MB_index).vel(2);
-        end
+%         else
+%             MB_window_coord_search(1,1) = MB(MB_index).new_pos(1)-MB_window_size_search_existing(1)+MB(MB_index).vel(1);
+%             MB_window_coord_search(2,1) = MB(MB_index).new_pos(1)+MB_window_size_search_existing(1)+MB(MB_index).vel(1);
+%             MB_window_coord_search(1,2) = MB(MB_index).new_pos(2)-MB_window_size_search_existing(2)+MB(MB_index).vel(2);
+%             MB_window_coord_search(2,2) = MB(MB_index).new_pos(2)+MB_window_size_search_existing(2)+MB(MB_index).vel(2);
+%         end
         
         % Check for out of bounce
         % y_start
@@ -124,8 +156,9 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
         end
         
         % Create temp window
-        img_temp_window = img_global_threshold(MB_window_coord_search(1,1):MB_window_coord_search(2,1),MB_window_coord_search(1,2):MB_window_coord_search(2,2));
-        %figure(); imagesc(img_temp_window); colormap('gray');%--- 
+        img_temp_window = img_inner_markers_global(MB_window_coord_search(1,1):MB_window_coord_search(2,1),MB_window_coord_search(1,2):MB_window_coord_search(2,2));
+%         fig_temp = figure(); imagesc(img_temp_window); colormap('gray'); set(fig_temp,'position',[-1850 570 560 420]);
+  
         
          % Check if any blobs are within window
         if any(img_temp_window(:))
@@ -155,7 +188,7 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
             %figure(); imagesc(img_blob_label_global); colormap('gray');%---
             % Removes all blobs inside the window
             for i = 1:blob_count_global_window
-                img_global_threshold(find(img_blob_label_global == blobs_global_window(i))) = 0;
+                img_inner_markers_global(find(img_blob_label_global == blobs_global_window(i))) = 0;
                 img_blob_label_global(find(img_blob_label_global == blobs_global_window(i))) = 0;
             end
             %figure(); imagesc(img_blob_label_global); colormap('gray');%---
@@ -208,9 +241,9 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
         % Check next MB from list
     end
     
-    while any(img_global_threshold(:))         
+    while any(img_blob_label_global(:))         
         % Find max intensity and its coordinates
-        [max_int, max_index] = max(img_global_threshold(:));
+        [max_int, max_index] = max(img_inner_markers_global(:));
         [max_y, max_x] = ind2sub(size(img), max_index);
 
         % Update window coordinates
@@ -286,7 +319,7 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
         %figure(); imagesc(img_blob_label_global); colormap('gray');%---
         % Removes all blobs inside the window
         for i = 1:blob_count_global_window
-            img_global_threshold(find(img_blob_label_global == blobs_global_window(i))) = 0;
+            img_inner_markers_global(find(img_blob_label_global == blobs_global_window(i))) = 0;
             img_blob_label_global(find(img_blob_label_global == blobs_global_window(i))) = 0;
         end
         %figure(); imagesc(img_blob_label_global); colormap('gray');%---
@@ -348,7 +381,7 @@ toc
 
 %% Find MB from coordinates
 temp = [];
-coord = [315 486];
+coord = [436 360];
 for i = 1:size(MB_log,2)
     for j = 1:size(MB_log(i).centroid,1)
         if MB_log(i).centroid(j,1) == coord(2) && MB_log(i).centroid(j,2) == coord(1); 
@@ -358,62 +391,62 @@ for i = 1:size(MB_log,2)
     end
 end
 
-%% Plot MB path and frequency response
-temp_y = MB_log(temp(1)).centroid(:,1);
-temp_x = MB_log(temp(1)).centroid(:,2);
-figure(); plot(temp_y)
-%figure(); plot(temp_x)te
-
-temp_y_fft = fft(temp_y-mean(temp_y));
-figure(); plot(linspace(0,fps/2,round(size(temp_y_fft,1)/2)),abs(temp_y_fft(1:round(size(temp_y_fft,1)/2)))); legend('1','2','3','4','5','6','7');  xlabel('Frequency (Hz)'); ylabel('Magnitude'); % title('Frequency spectrum of axial displacement');
-%temp_x_fft = fft(temp_x-mean(temp_x));
-%figure(); plot(linspace(0,fps/2,round(size(temp_x_fft,1)/2)),abs(temp_x_fft(1:round(size(temp_x_fft,1)/2)))); legend('1','2','3','4','5','6','7');  xlabel('Frequency (Hz)'); ylabel('Magnitude'); % title('Frequency spectrum of axial displacement');
-
-%%
-outputVideo=VideoWriter('contrast_video_clean_log_35');
-outputVideo.FrameRate=2;
-open(outputVideo);
-mov(1:50)= struct('cdata',[],'colormap',[]);
-pause(0.3)    
-for idx_frame = 4026:4046
-    
-     % Load img
-    img = load_img_contrast(idx_frame,n_bck_grnd,n_bck_grnd_skip,v_MB);
-%    img = abs(interp2(X,Y,img,Xq,Yq,interpolation_type));
-    %img = img(15:end,:);
-    
-%     % Calculate threshold
-%     SEM = std(img(:));               
-%     ts = tinv(0.9999999999,length(img(:))-1);     
-%     CI = mean(img(:)) + ts*SEM;
-%     global_threshold = CI;
-    
-%     img_global_threshold = img;
-%     img_global_threshold(img_global_threshold < global_threshold) = 0;
-    
-    %img = load_img_contrast(idx_frame,n_bck_grnd,n_bck_grnd_skip,v_MB);
-    pause(0.3)
-%     figure(4); plot(img);
-%     ylim([0 100]);
-    figure(2); imagesc(20*log10(img/max(img(:))), [-35 0]); colormap('gray');
-%     figure(2); imagesc(img_global_threshold); colormap('gray');    
-    xlabel('Lateral [mm]'); ylabel('Axial [mm]'); % title('Micro-Bubble image');
-    set(gca,'Xtick',linspace(0,size(img,2),5)); set(gca, 'XTickLabel',linspace(0,12,5));
-    set(gca,'Ytick',linspace(0,size(img,1),6)); set(gca, 'YTickLabel',linspace(0,25,6));
-    set(gca, 'DataAspectRatio',[1 4 1]) % set data aspect ratio in zoom box
-    set(gca, 'PlotBoxAspectRatio',[1 1 1])
-    
-    mov=getframe(gcf);
-    writeVideo(outputVideo,mov.cdata);
-
-    
-    
-%     norm = max(img_avg(:));
-%     limg_avg = 20*log10(img_avg/norm);
-%     figure(); imagesc(limg_avg,[-40 0]); colormap(gray);
-end
-close(gcf)
-close(outputVideo);
+% %% Plot MB path and frequency response
+% temp_y = MB_log(temp(1)).centroid(:,1);
+% temp_x = MB_log(temp(1)).centroid(:,2);
+% figure(); plot(temp_y)
+% %figure(); plot(temp_x)te
+% 
+% temp_y_fft = fft(temp_y-mean(temp_y));
+% figure(); plot(linspace(0,fps/2,round(size(temp_y_fft,1)/2)),abs(temp_y_fft(1:round(size(temp_y_fft,1)/2)))); legend('1','2','3','4','5','6','7');  xlabel('Frequency (Hz)'); ylabel('Magnitude'); % title('Frequency spectrum of axial displacement');
+% %temp_x_fft = fft(temp_x-mean(temp_x));
+% %figure(); plot(linspace(0,fps/2,round(size(temp_x_fft,1)/2)),abs(temp_x_fft(1:round(size(temp_x_fft,1)/2)))); legend('1','2','3','4','5','6','7');  xlabel('Frequency (Hz)'); ylabel('Magnitude'); % title('Frequency spectrum of axial displacement');
+% 
+% %%
+% outputVideo=VideoWriter('contrast_video_clean_log_35');
+% outputVideo.FrameRate=2;
+% open(outputVideo);
+% mov(1:50)= struct('cdata',[],'colormap',[]);
+% pause(0.3)    
+% for idx_frame = 4026:4046
+%     
+%      % Load img
+%     img = load_img_contrast(idx_frame,n_bck_grnd,n_bck_grnd_skip,v_MB);
+% %    img = abs(interp2(X,Y,img,Xq,Yq,interpolation_type));
+%     %img = img(15:end,:);
+%     
+% %     % Calculate threshold
+% %     SEM = std(img(:));               
+% %     ts = tinv(0.9999999999,length(img(:))-1);     
+% %     CI = mean(img(:)) + ts*SEM;
+% %     global_threshold = CI;
+%     
+% %     img_global_threshold = img;
+% %     img_global_threshold(img_global_threshold < global_threshold) = 0;
+%     
+%     %img = load_img_contrast(idx_frame,n_bck_grnd,n_bck_grnd_skip,v_MB);
+%     pause(0.3)
+% %     figure(4); plot(img);
+% %     ylim([0 100]);
+%     figure(2); imagesc(20*log10(img/max(img(:))), [-35 0]); colormap('gray');
+% %     figure(2); imagesc(img_global_threshold); colormap('gray');    
+%     xlabel('Lateral [mm]'); ylabel('Axial [mm]'); % title('Micro-Bubble image');
+%     set(gca,'Xtick',linspace(0,size(img,2),5)); set(gca, 'XTickLabel',linspace(0,12,5));
+%     set(gca,'Ytick',linspace(0,size(img,1),6)); set(gca, 'YTickLabel',linspace(0,25,6));
+%     set(gca, 'DataAspectRatio',[1 4 1]) % set data aspect ratio in zoom box
+%     set(gca, 'PlotBoxAspectRatio',[1 1 1])
+%     
+%     mov=getframe(gcf);
+%     writeVideo(outputVideo,mov.cdata);
+% 
+%     
+%     
+% %     norm = max(img_avg(:));
+% %     limg_avg = 20*log10(img_avg/norm);
+% %     figure(); imagesc(limg_avg,[-40 0]); colormap(gray);
+% end
+% close(gcf)
+% close(outputVideo);
 
 
 

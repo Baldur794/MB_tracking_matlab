@@ -38,6 +38,7 @@ for idx_wind = 1:size(img_wind_cord,1)
             mov_x(idx_wind,idx_frame-start_frame+1) = motion_x;
         end        
 end
+
 out = {mov_y mov_x index};
 end
 
