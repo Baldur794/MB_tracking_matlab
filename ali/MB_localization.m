@@ -2,20 +2,20 @@
 MB_window_coord_search = zeros(2,2); % Coordinates for search window
 MB_window_coord_search_clear = zeros(2,2); % Coordinates for search clear window
 
-MB_window_size_search_localization = [5 5]; % [y,x] Search window for localization of PSF's
-MB_window_size_search_new = [5 5]; % [y,x] Search window for new MB's
+MB_window_size_search_localization = [7 7]; % [y,x] Search window for localization of PSF's
+MB_window_size_search_new = [10 10]; % [y,x] Search window for new MB's
 MB_window_size_search_existing = [5 5]; % [y,x] Search window for ''old'' MB's
 MB_window_size_search_clear = MB_window_size_search_new;%[7 7]; % [y,x] Search window for ''old'' MB's
 
 
-MB_age_condition = 0;
+MB_age_condition = 1;
 MB_window_threshold = 2; % Window Threshold (actual MB_window_threshold = Max_intensity*1/threshold)
 weighing_factor = 1; % Distance weighing factor
 weighing_filter_radius = 3; % Radius around centroid to be considered
 
 MB_window_out_of_bounce = 0; % Checks if search windows is outside image
 
-nframe = 19;
+nframe = 1;
 idx_frame_start = 1;
 img_size = [630,600];
 
@@ -38,14 +38,14 @@ MB_log = MB;
 
 
 tic
-for idx_frame=idx_frame_start:idx_frame_start+nframe
+for idx_frame=idx_frame_start:idx_frame_start+nframe-1
     idx_frame
     % Load img
     load([filepath num2str(idx_frame,'%d') '.mat']);
     img = abs(im_mv);
     %figure(); imagesc(img); colormap('gray');%--- 
     
-    global_threshold = max(img(:)/2);
+    global_threshold = max(img(:)/10);
     
     % Threshold
     img_global_threshold = img;

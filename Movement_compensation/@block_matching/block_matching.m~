@@ -43,16 +43,16 @@ classdef block_matching
                     [c(:,i) lag(:,i)] = crosscorr(img_new,img_ref(:,i),obj.max_mov_y*6);
 %                     figure();crosscorr(img_new,img_ref(:,i),obj.max_mov_y*2);
 %---------------------
-% figure(1);crosscorr(img_new,img_ref(:,i),obj.max_mov_y*2);
-% title('Cross Correlation (Frame 1-2)');
-% set(gca,'Xtick',linspace(-20,20,9)); set(gca, 'XTickLabel',linspace(-30,10,9));
-% figure(2);
-% hold on
-% plot(img_new,'r');
-% xlim([0 400]);
-% xlabel('Axial (\mum)'); ylabel('Intensity'); title('Frame 1-2');
-% set(gca,'Xtick',linspace(1,400,6)); set(gca, 'XTickLabel',linspace(0,5000,6));
-% %set(gca,'Ytick',linspace(0,1960,6)); set(gca, 'YTickLabel',linspace(0,25,6));
+figure(1);crosscorr(img_new,img_ref(:,i),obj.max_mov_y*2);
+title('Cross Correlation (Frame 1-2)');
+set(gca,'Xtick',linspace(-20,20,9)); set(gca, 'XTickLabel',linspace(-30,10,9));
+figure(2);
+hold on
+plot(img_new);
+xlim([0 400]);
+xlabel('Axial (\mum)'); ylabel('Intensity'); title('Frame 1-2');
+set(gca,'Xtick',linspace(1,400,6)); set(gca, 'XTickLabel',linspace(0,5000,6));
+%set(gca,'Ytick',linspace(0,1960,6)); set(gca, 'YTickLabel',linspace(0,25,6));
 %------------------------
                 end              
                 n = 20;
@@ -114,7 +114,7 @@ classdef block_matching
              
             % Load img
             if strcmp(mode,'b_mode')
-                img_ref = real(load_img_B_mode(idx_frame));%---------------------------
+                img_ref = abs(load_img_B_mode(idx_frame));%---------------------------
             elseif strcmp(mode,'contrast')
                 img_ref = abs(load_img_contrast(idx_frame,obj.n_fore_grnd,obj.n_fore_grnd,obj.n_bck_grnd_skip));
                 img_ref(img_avg == 0) = 0;
@@ -143,7 +143,7 @@ classdef block_matching
             
             % Load new img
             if strcmp(mode,'b_mode')
-                img_new = real(load_img_B_mode(idx_frame));%-------------------
+                img_new = abs(load_img_B_mode(idx_frame));%-------------------
             elseif strcmp(mode,'contrast')
                 img_new = abs(load_img_contrast(idx_frame,obj.n_fore_grnd,obj.n_fore_grnd,obj.n_bck_grnd_skip));
                 img_new(img_avg == 0) = 0;

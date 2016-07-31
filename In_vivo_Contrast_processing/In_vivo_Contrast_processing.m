@@ -2,13 +2,13 @@
 MB_window_coord_search = zeros(2,2); % Coordinates for search window
 MB_window_coord_search_clear = zeros(2,2); % Coordinates for search clear window
 
-MB_window_size_search_localization = [15 15]; % [y,x] Search window for localization of PSF's
+MB_window_size_search_localization = [30 30]; % [y,x] Search window for localization of PSF's
 MB_window_size_search_new = [7 7]; % [y,x] Search window for new MB's
 MB_window_size_search_existing = [5 5]; % [y,x] Search window for ''old'' MB's
 MB_window_size_search_clear = [20 20]; % [y,x] Search window for ''old'' MB's
 
 
-MB_age_condition = 8;
+MB_age_condition = 1;
 MB_count_condition = 40; % Number of areas within search windows
 MB_window_size_density_avg = [5 3]; % Window for density condition
 MB_window_size_density_stuck = [10 10]; % Window for density condition
@@ -61,22 +61,18 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
     % Load img
     img = load_img_contrast(idx_frame,n_bck_grnd,n_bck_grnd_skip,v_MB);
     img = interp2(X,Y,img,Xq,Yq,interpolation_type);
-    %img = img(15:end,:);
+%     figure(); imagesc(img); colormap('gray');%---
     
     % Calculate threshold
     SEM = std(img(:));               
     ts = tinv(0.9999999999,length(img(:))-1);     
     CI = mean(img(:)) + ts*SEM;
     global_threshold = CI;
-    %pause(1);
-    %figure(1); imagesc(real(20*log10(img/max(img(:)))),[-15,0]); colormap('gray');
-    %figure(1); imagesc(img,[20,21]); colormap('gray');
-    %figure(3); plot(img);
-    %img = interp2(X,Y,img,Xq,Yq);
     
     % Threshold
     img_global_threshold = img;
     img_global_threshold(img_global_threshold < global_threshold) = 0;
+    %figure(); imagesc(img_global_threshold); colormap('gray');%---
     
     % blob labeling from threshold img
     [img_blob_label_global,blob_count_global] = bwlabel(img_global_threshold,4);
@@ -299,7 +295,7 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
         
         % Thresholding
         img_temp_window(find(img_temp_window < max_int/MB_window_threshold)) = 0;
-        %figure(); imagesc(img_temp_window); colormap('gray');%---
+        figure(); imagesc(img_temp_window); colormap('gray');%---
         
         % Count number of blobs in window from global img
         img_blob_label_global_window = img_blob_label_global(MB_window_coord_search_clear(1,1):MB_window_coord_search_clear(2,1),MB_window_coord_search_clear(1,2):MB_window_coord_search_clear(2,2));
@@ -408,7 +404,7 @@ toc
 %     
 for idx_frame = 4026:4046
     
-     % Load img
+    % Load img
     img = load_img_contrast(idx_frame,n_bck_grnd,n_bck_grnd_skip,v_MB);
     img = interp2(X,Y,img,Xq,Yq,interpolation_type);
     %img = img(15:end,:);

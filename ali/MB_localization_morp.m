@@ -7,23 +7,25 @@ MB_window_size_search_new = [10 10]; % [y,x] Search window for new MB's
 MB_window_size_search_existing = [5 5]; % [y,x] Search window for ''old'' MB's
 MB_window_size_search_clear = MB_window_size_search_new;%[7 7]; % [y,x] Search window for ''old'' MB's
 
-
-MB_age_condition = 5;
+MB_area_condition = 3;
+MB_eccentricity_condition = 0.8;
+MB_age_condition = 0;
+MB_count_condition = 40; % Number of areas within search windows
 MB_window_threshold = 2; % Window Threshold (actual MB_window_threshold = Max_intensity*1/threshold)
 weighing_factor = 1; % Distance weighing factor
 weighing_filter_radius = 3; % Radius around centroid to be considered
 
 MB_window_out_of_bounce = 0; % Checks if search windows is outside image
 
-nframe = 20;
+nframe = 1;
 idx_frame_start = 1;
 img_size = [630,600];
 
 filepath = '/data/cfudata6/s134082/Bachelorprojekt/simulation_data/ali/RowData_Npoints_200_Time_';
 
 % Create annular structuring element for inner marking segmentation
-radius_inner = 5;
-radius_outer = 8;
+radius_inner = 4;
+radius_outer = 6;
 center = radius_outer+1;
 [W,H] = meshgrid(1:2*radius_outer+1,1:2*radius_outer+1);
 strel_ring = (sqrt((W-center).^2 + (H-center).^2) <= radius_outer) & (sqrt((W-center).^2 + (H-center).^2) >= radius_inner); 
@@ -52,7 +54,7 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe-1
     idx_frame
     % Load img
     load([filepath num2str(idx_frame,'%d') '.mat']);
-    img = abs(im_mv);
+     img = abs(im_mv);
     %figure(); imagesc(img); colormap('gray');%---  
     
     % inner maker image
@@ -72,24 +74,30 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe-1
     img_inner_markers_pointwise_lowest = img-img_inner_pointwise_lowest;
 %     figure(); imagesc(img_inner_markers_pointwise_lowest); colormap('gray');%---
     
-    % erosion of small blobs by opening
-    img_inner_markers_open = img_inner_markers_pointwise_lowest; %imopen(img_inner_markers_pointwise_lowest,strel_small_ring);
-%     figure(); imagesc(img_inner_markers_open); colormap('gray');%---
+    img_blob_BW = (img_inner_markers_pointwise_lowest > 0);
+%     figure(); imagesc(img_blob_BW); colormap('gray');%---
     
-    % inner markers with original values
-    img_inner_markers_global = img.* (img_inner_markers_open > 0);
+    % find properties for each blob
+    img_blob_prop = regionprops(img_blob_BW,'centroid','Area','Eccentricity');
+    
+    % identify blobs with certain criteria
+    idx_prop = find([img_blob_prop.Area] > MB_area_condition & [img_blob_prop.Eccentricity] < MB_eccentricity_condition); 
+    
+    % extract blobs with certain criteria
+    img_blob_BW_prop = ismember(labelmatrix(bwconncomp(img_blob_BW)), idx_prop);  
+%      figure(); imagesc(img_blob_BW_prop); colormap('gray');%---
+    
+    % get inner markers with original values
+    img_inner_markers_global = img.* img_blob_BW_prop;
 %     figure(); imagesc(img_inner_markers_global); colormap('gray');%---
     
     % blob labeling of inner markers
-    [img_blob_label_global,blob_count_inner_marker] = bwlabel(img_inner_markers_global,4);
+    [img_blob_label_global, blob_count_inner_marker] = bwlabel(img_blob_BW_prop,4);
 %     figure(); imagesc(img_blob_label_global); colormap('gray');%---
-    
-    
-    
-    
+
     % Sort MB's after intensity
     MB_sort_index = logical([MB.state]);
-    [~,MB_sort_index] = sort([MB.max_int].*MB_sort_index,'descend'); 
+    [~, MB_sort_index] = sort([MB.max_int].*MB_sort_index,'descend'); 
     % Connect MB's
     for i = 1:sum([MB.state])
         % Update MB_index

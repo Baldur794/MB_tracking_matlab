@@ -1,153 +1,130 @@
 %% Age and Density filter
-MB_index_filter_avg = []; % Filtered list of MB's satisfying conditions
+MB_index_filter_age = [];
+MB_index_filter_count = [];
 MB_index_filter_stuck = []; % Filtered list of MB's satisfying conditions
-MB_index_filter_vel_std = [];
+MB_index_filter_avg = []; % Filtered list of MB's satisfying conditions
+MB_index_filter_single = []; % Filtered list of MB's satisfying conditions
+
 MB_index_list = []; % List of indexes with for found MB's
 MB_vel_list = []; % List with all velocity vectors
 temp = [];
 MB_log_copy = MB_log;
-% List all MB positions and their velocities
 
-idx_temp_del = [];
-for MB_index = 1:size(MB_log_copy,2)
-    if (MB_log_copy(MB_index).age(3) > MB_age_condition) && (max(MB_log_copy(MB_index).count(:)) <= MB_count_condition)
-        MB_vel_x = MB_log_copy(MB_index).vel(:,2);
-        MB_vel_y = MB_log_copy(MB_index).vel(:,1);
-        
-        uq_x = quantile(MB_vel_x,0.75);
-        lq_x = quantile(MB_vel_x,0.25);
-        iq_x = uq_x-lq_x;
-        ub_x = uq_x+iq_x*2;
-        lb_x = lq_x-iq_x*2;
-        
-        
-        uq_y = quantile(MB_vel_y,0.75);
-        lq_y = quantile(MB_vel_y,0.25);
-        iq_y = uq_y-lq_y;
-        ub_y = uq_y+iq_y*2;
-        lb_y = lq_y-iq_y*2;
-        
-        if (abs(ub_x - mean(MB_vel_x)) > MB_vel_variance_condition) || (abs(lb_x - mean(MB_vel_x)) > MB_vel_variance_condition)...
-                || (abs(ub_y - mean(MB_vel_y)) > MB_vel_variance_condition) || (abs(lb_y - mean(MB_vel_y)) > MB_vel_variance_condition)
-            idx_temp_del = [idx_temp_del MB_index];
-        else
-            idx_temp_del_vel = [];
-            for i = 1:size(MB_vel_x,1)
-                if (MB_vel_x(i) > ub_x) || (MB_vel_x(i) < lb_x) || (MB_vel_y(i) > ub_y) || (MB_vel_y(i) < lb_y)
-                    idx_temp_del_vel = [idx_temp_del_vel i];
-                end
-            end
-            MB_log_copy(MB_index).vel(idx_temp_del_vel,:) = [];
-            MB_log_copy(MB_index).old_pos(idx_temp_del_vel,:) = [];
-            MB_log_copy(MB_index).new_pos(idx_temp_del_vel,:) = [];
-            MB_log_copy(MB_index).centroid(idx_temp_del_vel,:) = [];
-        end
-    end
-end
-MB_log_copy(idx_temp_del) = [];
 
+
+% check age condition
 for MB_index = 1:size(MB_log_copy,2)
-   if (MB_log_copy(MB_index).age(3) > MB_age_condition) && (max(MB_log_copy(MB_index).count(:)) <= MB_count_condition)
-       MB_index_list = [MB_index_list, sub2ind([img_size(1:2)],MB_log_copy(MB_index).centroid(1:end-1,1) ,MB_log_copy(MB_index).centroid(1:end-1,2))'];
-       MB_vel_list = [MB_vel_list, [MB_log_copy(MB_index).centroid(2:end,1)-MB_log_copy(MB_index).centroid(1:end-1,1),MB_log_copy(MB_index).centroid(2:end,2)-MB_log_copy(MB_index).centroid(1:end-1,2)]'];
+   if (MB_log_copy(MB_index).age(3) > MB_age_condition)
+    MB_index_filter_age = [MB_index_filter_age, MB_index];
    end
 end
 
-% Scatter image from all MB locations
-scatter_matrix = zeros([img_size(1:2)]); 
-for i = 1:size(MB_index_list,2)
-    scatter_matrix(MB_index_list(i)) = scatter_matrix(MB_index_list(i)) + 1;
+for i = 1:size(MB_index_filter_age,2)
+    MB_index = MB_index_filter_age(i);
+   if (max(MB_log_copy(MB_index).count(:)) <= MB_count_condition)
+    MB_index_filter_count = [MB_index_filter_count, MB_index];
+   end
 end
+
+% idx_temp_del = [];
+% for MB_index = 1:size(MB_log_copy,2)
+%     if (MB_log_copy(MB_index).age(3) > MB_age_condition) && (max(MB_log_copy(MB_index).count(:)) <= MB_count_condition)
+%         MB_vel_x = MB_log_copy(MB_index).vel(:,2);
+%         MB_vel_y = MB_log_copy(MB_index).vel(:,1);
+%         
+%         uq_x = quantile(MB_vel_x,0.75);
+%         lq_x = quantile(MB_vel_x,0.25);
+%         iq_x = uq_x-lq_x;
+%         ub_x = uq_x+iq_x*2;
+%         lb_x = lq_x-iq_x*2;
+%         
+%         
+%         uq_y = quantile(MB_vel_y,0.75);
+%         lq_y = quantile(MB_vel_y,0.25);
+%         iq_y = uq_y-lq_y;
+%         ub_y = uq_y+iq_y*2;
+%         lb_y = lq_y-iq_y*2;
+%         
+%         if (abs(ub_x - mean(MB_vel_x)) > MB_vel_variance_condition) || (abs(lb_x - mean(MB_vel_x)) > MB_vel_variance_condition)...
+%                 || (abs(ub_y - mean(MB_vel_y)) > MB_vel_variance_condition) || (abs(lb_y - mean(MB_vel_y)) > MB_vel_variance_condition)
+%             idx_temp_del = [idx_temp_del MB_index];
+%         else
+%             idx_temp_del_vel = [];
+%             for i = 1:size(MB_vel_x,1)
+%                 if (MB_vel_x(i) > ub_x) || (MB_vel_x(i) < lb_x) || (MB_vel_y(i) > ub_y) || (MB_vel_y(i) < lb_y)
+%                     idx_temp_del_vel = [idx_temp_del_vel i];
+%                 end
+%             end
+%             MB_log_copy(MB_index).vel(idx_temp_del_vel,:) = [];
+%             MB_log_copy(MB_index).old_pos(idx_temp_del_vel,:) = [];
+%             MB_log_copy(MB_index).new_pos(idx_temp_del_vel,:) = [];
+%             MB_log_copy(MB_index).centroid(idx_temp_del_vel,:) = [];
+%         end
+%     end
+% end
+% MB_log_copy(idx_temp_del) = [];
 
 %------ 
 %Remove stuck MB's
-for MB_index = 1:size(MB_log_copy,2) 
+for i = 1:size(MB_index_filter_count,2)
+    MB_index = MB_index_filter_count(i);
     MB_density_list = [];
+    index_list_MB_index = [sub2ind([img_size(1:2)],MB_log_copy(MB_index).centroid(1:end-1,1) ,MB_log_copy(MB_index).centroid(1:end-1,2))']; % list of positions and vel for given MB
     
-    % Check conditions
-    if (MB_log_copy(MB_index).age(3) > MB_age_condition) && (max(MB_log_copy(MB_index).count(:)) <= MB_count_condition)
-       index_list_MB_index = [sub2ind([img_size(1:2)],MB_log_copy(MB_index).centroid(1:end-1,1) ,MB_log_copy(MB_index).centroid(1:end-1,2))']; % list of positions and vel for given MB
-       
-       % Scatter image from current MB
-       logical_matrix_MB_index = zeros([img_size(1:2)]);
-       for i = 1:size(index_list_MB_index,2)
-            logical_matrix_MB_index(index_list_MB_index(i)) = logical_matrix_MB_index(index_list_MB_index(i)) + 1; % Add the MB in interest
-       end
-       
-       % Calculated density of MB in window
-       for i = 1:size(index_list_MB_index,2)
-            % y,x subscripts from direct matrix indexes
-            [subscript_y, subscript_x] = ind2sub([img_size(1:2)],index_list_MB_index(i));         
-            
-            % Update window coordinates
-            MB_window_coord(1,1) = subscript_y-MB_window_size_density_stuck(1);
-            MB_window_coord(2,1) = subscript_y+MB_window_size_density_stuck(1);
-            MB_window_coord(1,2) = subscript_x-MB_window_size_density_stuck(2);
-            MB_window_coord(2,2) = subscript_x+MB_window_size_density_stuck(2);
-
-            % Check for out of bounce
-            % y1
-            if MB_window_coord(1,1) <= 0
-                MB_window_coord(1,1) = 1;
-            end
-            % y2
-            if MB_window_coord(2,1) > img_size(1)
-                MB_window_coord(2,1) = img_size(1);
-            end
-            % x1
-            if MB_window_coord(1,2) <= 0
-                MB_window_coord(1,2) = 1;
-            end
-            % x2
-            if MB_window_coord(2,2) > img_size(2)
-                MB_window_coord(2,2) = img_size(2);
-            end
-
-            % Sum number of MB in window
-            logical_matrix_MB_index_window = logical_matrix_MB_index(MB_window_coord(1,1):MB_window_coord(2,1),MB_window_coord(1,2):MB_window_coord(2,2));
-            MB_density_list(i) = sum(sum(logical_matrix_MB_index_window));
-            %MB_density = MB_density + sum(sum(logical_matrix_MB_index_window));
-       end
-       % Calculate average
-       MB_density = sum(MB_density_list)/MB_log_copy(MB_index).age(3);
-       
-       % Check density condition
-        if (MB_density <= MB_dens_condition_stuck)% && (min(MB_density_list) >= MB_dens_condition_single)
-         MB_index_filter_stuck = [MB_index_filter_stuck, MB_index];
+    % Scatter image from current MB
+    logical_matrix_MB_index = zeros([img_size(1:2)]);
+    for j = 1:size(index_list_MB_index,2)
+        logical_matrix_MB_index(index_list_MB_index(j)) = logical_matrix_MB_index(index_list_MB_index(j)) + 1; % Add the MB in interest
+    end
+    
+    % Calculated density of MB in window
+    for j = 1:size(index_list_MB_index,2)
+        % y,x subscripts from direct matrix indexes
+        [subscript_y, subscript_x] = ind2sub([img_size(1:2)],index_list_MB_index(j));
+        
+        % Update window coordinates
+        MB_window_coord(1,1) = subscript_y-MB_window_size_density_stuck(1);
+        MB_window_coord(2,1) = subscript_y+MB_window_size_density_stuck(1);
+        MB_window_coord(1,2) = subscript_x-MB_window_size_density_stuck(2);
+        MB_window_coord(2,2) = subscript_x+MB_window_size_density_stuck(2);
+        
+        % Check for out of bounce
+        % y1
+        if MB_window_coord(1,1) <= 0
+            MB_window_coord(1,1) = 1;
         end
-   end
+        % y2
+        if MB_window_coord(2,1) > img_size(1)
+            MB_window_coord(2,1) = img_size(1);
+        end
+        % x1
+        if MB_window_coord(1,2) <= 0
+            MB_window_coord(1,2) = 1;
+        end
+        % x2
+        if MB_window_coord(2,2) > img_size(2)
+            MB_window_coord(2,2) = img_size(2);
+        end
+        
+        % Sum number of MB in window
+        logical_matrix_MB_index_window = logical_matrix_MB_index(MB_window_coord(1,1):MB_window_coord(2,1),MB_window_coord(1,2):MB_window_coord(2,2));
+        MB_density_list(j) = sum(sum(logical_matrix_MB_index_window));
+    end
+    % Calculate average
+    MB_density = sum(MB_density_list)/MB_log_copy(MB_index).age(3);
+    
+    % Check density condition
+    if (MB_density <= MB_dens_condition_stuck)
+        MB_index_filter_stuck = [MB_index_filter_stuck, MB_index];
+    end
 end
 %------
 
-
-% Check direction consistency
-%----
-% Find density of other MB for each MB location
-for j = 1:size(MB_index_filter_stuck ,2) 
-   MB_index = MB_index_filter_stuck(j);
-    
-    % Check conditions
-    if (MB_log_copy(MB_index).age(3) > MB_age_condition) && (max(MB_log_copy(MB_index).count(:)) <= MB_count_condition)
-       MB_vel_x = MB_log_copy(MB_index).vel(:,2);
-       MB_vel_y = MB_log_copy(MB_index).vel(:,1);
-       MB_vel_mean_x = abs(mean(MB_vel_x));
-       MB_vel_mean_y = abs(mean(MB_vel_y));
-       %temp = [temp [MB_vel_mean_x; MB_vel_mean_y]];        
-       % Check density condition
-       if (MB_vel_mean_x >= MB_vel_mean_condition_x) || (MB_vel_mean_y >= MB_vel_mean_condition_y)
-        MB_index_filter_vel_std = [MB_index_filter_vel_std, MB_index];
-       end
-   end
-end
-%----
-
+MB_index_list = [];
 % List all MB positions and their velocities
-for i = 1:size(MB_index_filter_vel_std ,2)
-   MB_index = MB_index_filter_vel_std(i);
-   if (MB_log_copy(MB_index).age(3) > MB_age_condition) && (max(MB_log_copy(MB_index).count(:)) <= MB_count_condition)
-       MB_index_list = [MB_index_list, sub2ind([img_size(1:2)],MB_log_copy(MB_index).centroid(1:end-1,1) ,MB_log_copy(MB_index).centroid(1:end-1,2))'];
-       MB_vel_list = [MB_vel_list, [MB_log_copy(MB_index).centroid(2:end,1)-MB_log_copy(MB_index).centroid(1:end-1,1),MB_log_copy(MB_index).centroid(2:end,2)-MB_log_copy(MB_index).centroid(1:end-1,2)]'];
-   end
+for i = 1:size(MB_index_filter_stuck ,2)
+   MB_index = MB_index_filter_stuck(i);
+   MB_index_list = [MB_index_list, sub2ind([img_size(1:2)],MB_log_copy(MB_index).centroid(1:end-1,1) ,MB_log_copy(MB_index).centroid(1:end-1,2))'];
 end
 
 % Scatter image from all MB locations
@@ -157,78 +134,67 @@ for i = 1:size(MB_index_list,2)
 end
 
 
-% Find density of other MB for each MB location
-for j = 1:size(MB_index_filter_vel_std ,2) 
-   MB_index = MB_index_filter_vel_std(j);
+% Find avg density of other MB for each MB location
+for i = 1:size(MB_index_filter_stuck ,2)
+    MB_index = MB_index_filter_stuck(i);
     MB_density_list = [];
     
-    % Check conditions
-    if (MB_log_copy(MB_index).age(3) > MB_age_condition) && (max(MB_log_copy(MB_index).count(:)) <= MB_count_condition)
-       MB_density = 0; % number of MB's found around given MB with # MB_index
-       index_list_MB_index = [sub2ind([img_size(1:2)],MB_log_copy(MB_index).centroid(1:end-1,1) ,MB_log_copy(MB_index).centroid(1:end-1,2))']; % list of positions and vel for given MB
-       
-       % Scatter image without the current MB
-       logical_matrix_MB_index = scatter_matrix;
-       for i = 1:size(index_list_MB_index,2)
-            logical_matrix_MB_index(index_list_MB_index(i)) = logical_matrix_MB_index(index_list_MB_index(i)) - 1; % Removes the MB in interest
-       end
-       
-       % Calculated density of MB in window
-       for i = 1:size(index_list_MB_index,2)
-            % y,x subscripts from direct matrix indexes
-            [subscript_y, subscript_x] = ind2sub([img_size(1:2)],index_list_MB_index(i));         
-            
-            % Update window coordinates
-            MB_window_coord(1,1) = subscript_y-MB_window_size_density_avg(1);
-            MB_window_coord(2,1) = subscript_y+MB_window_size_density_avg(1);
-            MB_window_coord(1,2) = subscript_x-MB_window_size_density_avg(2);
-            MB_window_coord(2,2) = subscript_x+MB_window_size_density_avg(2);
-
-            % Check for out of bounce
-            % y1
-            if MB_window_coord(1,1) <= 0
-                MB_window_coord(1,1) = 1;
-            end
-            % y2
-            if MB_window_coord(2,1) > img_size(1)
-                MB_window_coord(2,1) = img_size(1);
-            end
-            % x1
-            if MB_window_coord(1,2) <= 0
-                MB_window_coord(1,2) = 1;
-            end
-            % x2
-            if MB_window_coord(2,2) > img_size(2)
-                MB_window_coord(2,2) = img_size(2);
-            end
-
-            % Sum number of MB in window
-            logical_matrix_MB_index_window = logical_matrix_MB_index(MB_window_coord(1,1):MB_window_coord(2,1),MB_window_coord(1,2):MB_window_coord(2,2));
-            MB_density_list(i) = sum(sum(logical_matrix_MB_index_window));
-            %MB_density = MB_density + sum(sum(logical_matrix_MB_index_window));
-       end
-       % Calculate average
-       MB_density = sum(MB_density_list)/MB_log_copy(MB_index).age(3);
-       
-       % Check density condition
-       if (MB_density >= MB_dens_condition_avg)% && (min(MB_density_list) >= MB_dens_condition_single)
+    index_list_MB_index = [sub2ind([img_size(1:2)],MB_log_copy(MB_index).centroid(1:end-1,1) ,MB_log_copy(MB_index).centroid(1:end-1,2))']; % list of positions and vel for given MB
+    
+    % Scatter image without the current MB
+    logical_matrix_MB_index = scatter_matrix;
+    for j = 1:size(index_list_MB_index,2)
+        logical_matrix_MB_index(index_list_MB_index(j)) = logical_matrix_MB_index(index_list_MB_index(j)) - 1; % Removes the MB in interest
+    end
+    
+    % Calculated density of MB in window
+    for j = 1:size(index_list_MB_index,2)
+        % y,x subscripts from direct matrix indexes
+        [subscript_y, subscript_x] = ind2sub([img_size(1:2)],index_list_MB_index(j));
+        
+        % Update window coordinates
+        MB_window_coord(1,1) = subscript_y-MB_window_size_density_avg(1);
+        MB_window_coord(2,1) = subscript_y+MB_window_size_density_avg(1);
+        MB_window_coord(1,2) = subscript_x-MB_window_size_density_avg(2);
+        MB_window_coord(2,2) = subscript_x+MB_window_size_density_avg(2);
+        
+        % Check for out of bounce
+        % y1
+        if MB_window_coord(1,1) <= 0
+            MB_window_coord(1,1) = 1;
+        end
+        % y2
+        if MB_window_coord(2,1) > img_size(1)
+            MB_window_coord(2,1) = img_size(1);
+        end
+        % x1
+        if MB_window_coord(1,2) <= 0
+            MB_window_coord(1,2) = 1;
+        end
+        % x2
+        if MB_window_coord(2,2) > img_size(2)
+            MB_window_coord(2,2) = img_size(2);
+        end
+        
+        % Sum number of MB in window
+        logical_matrix_MB_index_window = logical_matrix_MB_index(MB_window_coord(1,1):MB_window_coord(2,1),MB_window_coord(1,2):MB_window_coord(2,2));
+        MB_density_list(j) = sum(sum(logical_matrix_MB_index_window)); % number of MB's found around given MB with # MB_index
+    end
+    % Calculate average
+    MB_density = sum(MB_density_list)/MB_log_copy(MB_index).age(3);
+    
+    % Check density condition
+    if (MB_density >= MB_dens_condition_avg)% && (min(MB_density_list) >= MB_dens_condition_single)
         MB_index_filter_avg = [MB_index_filter_avg, MB_index];
-       end
-   end
+    end
 end
 
  %----------------------------
-MB_index_filter_single = []; % Filtered list of MB's satisfying conditions
 MB_index_list = []; % List of indexes with for found MB's
-MB_vel_list = [];
-
 % List all MB positions and their velocities
 for i = 1:size(MB_index_filter_avg ,2)
-   MB_index = MB_index_filter_avg(i);
-   if (MB_log_copy(MB_index).age(3) > MB_age_condition) && (max(MB_log_copy(MB_index).count(:)) <= MB_count_condition)
-       MB_index_list = [MB_index_list, sub2ind([img_size(1:2)],MB_log_copy(MB_index).centroid(1:end-1,1) ,MB_log_copy(MB_index).centroid(1:end-1,2))'];
-       MB_vel_list = [MB_vel_list, [MB_log_copy(MB_index).centroid(2:end,1)-MB_log_copy(MB_index).centroid(1:end-1,1),MB_log_copy(MB_index).centroid(2:end,2)-MB_log_copy(MB_index).centroid(1:end-1,2)]'];
-   end
+    MB_index = MB_index_filter_avg(i);
+    MB_index_list = [MB_index_list, sub2ind([img_size(1:2)],MB_log_copy(MB_index).centroid(1:end-1,1) ,MB_log_copy(MB_index).centroid(1:end-1,2))'];
 end
 
 % Scatter image from all MB locations
@@ -238,21 +204,23 @@ for i = 1:size(MB_index_list,2)
 end
 
 % Find density of other MB for each MB location
-for j = 1:size(MB_index_filter_avg ,2) 
-    MB_index = MB_index_filter_avg(j);
+for i = 1:size(MB_index_filter_avg ,2) 
+    MB_index = MB_index_filter_avg(i);
   
        index_list_MB_index = [sub2ind([img_size(1:2)],MB_log_copy(MB_index).centroid(1:end-1,1) ,MB_log_copy(MB_index).centroid(1:end-1,2))']; % list of positions and vel for given MB
        
        % Scatter image without the current MB
        logical_matrix_MB_index = scatter_matrix;
-       for i = 1:size(index_list_MB_index,2)
-            logical_matrix_MB_index(index_list_MB_index(i)) = logical_matrix_MB_index(index_list_MB_index(i)) - 1; % Removes the MB in interest
+       for j = 1:size(index_list_MB_index,2)
+            logical_matrix_MB_index(index_list_MB_index(j)) = logical_matrix_MB_index(index_list_MB_index(j)) - 1; % Removes the MB in interest
        end
        
+       MB_density_list = [];
+       
        % Calculated density of MB in window
-       for i = 1:size(index_list_MB_index,2)
+       for j = 1:size(index_list_MB_index,2)
             % y,x subscripts from direct matrix indexes
-            [subscript_y, subscript_x] = ind2sub([img_size(1:2)],index_list_MB_index(i));         
+            [subscript_y, subscript_x] = ind2sub([img_size(1:2)],index_list_MB_index(j));         
             
             % Update window coordinates
             MB_window_coord(1,1) = subscript_y-MB_window_size_density_single(1);
@@ -280,28 +248,23 @@ for j = 1:size(MB_index_filter_avg ,2)
 
             % Sum number of MB in window
             logical_matrix_MB_index_window = logical_matrix_MB_index(MB_window_coord(1,1):MB_window_coord(2,1),MB_window_coord(1,2):MB_window_coord(2,2));
-            MB_density_list = sum(sum(logical_matrix_MB_index_window));
-            % Check density condition
-            if (MB_density_list < MB_dens_condition_single)
-                break;
-       
-            end
-            if i == size(index_list_MB_index,2)
-                MB_index_filter_single = [MB_index_filter_single, MB_index];
-            end
+            MB_density_list = [MB_density_list sum(sum(logical_matrix_MB_index_window))];
+       end
+       % Check density condition
+       if (~any(MB_density_list < MB_dens_condition_single))
+           MB_index_filter_single = [MB_index_filter_single, MB_index];
        end
 end
 
 
  %-----------------------------
-
-
 % List of MB positions and their velocities satisfying conditions
-MB_index_list = []; 
-MB_vel_list = []; 
+MB_index_list = [];
+MB_vel_list = [];
 for i = 1:size(MB_index_filter_single,2)
-  MB_index_list = [MB_index_list, sub2ind([img_size(1:2)],MB_log_copy(MB_index_filter_single(i)).centroid(2:end-1,1) ,MB_log_copy(MB_index_filter_single(i)).centroid(2:end-1,2))'];
-  MB_vel_list = [MB_vel_list, [MB_log_copy(MB_index_filter_single(i)).centroid(3:end,1)-MB_log_copy(MB_index_filter_single(i)).centroid(2:end-1,1),MB_log_copy(MB_index_filter_single(i)).centroid(3:end,2)-MB_log_copy(MB_index_filter_single(i)).centroid(2:end-1,2)]'];
+  MB_index = MB_index_filter_single(i);
+  MB_index_list = [MB_index_list, sub2ind([img_size(1:2)],MB_log_copy(MB_index).centroid(2:end-1,1) ,MB_log_copy(MB_index).centroid(2:end-1,2))'];
+  MB_vel_list = [MB_vel_list, [MB_log_copy(MB_index).centroid(3:end,1)-MB_log_copy(MB_index).centroid(2:end-1,1),MB_log_copy(MB_index).centroid(3:end,2)-MB_log_copy(MB_index).centroid(2:end-1,2)]'];
 end
       
 % Scatter image from all MB locations
@@ -585,5 +548,16 @@ ch = colorbar;
  colormap(vel_color);
  ylabel(ch,'Velocity [mm/s]')
 
-
-
+ 
+ %% M mode image
+ 
+ img_m = zeros(201,401);
+for i = 1:400 
+    img_old = real(load_img_B_mode(i));
+    img_line = img_old(700:900,130:130);
+    img_m(:,i) = img_line;
+end
+figure(); imagesc(img_m);
+xlabel('Time (s)'); ylabel('Axial (\mum)'); % title('Micro-Bubble image');
+set(gca,'Xtick',linspace(0,400,9)); set(gca, 'XTickLabel',linspace(0,8,9));
+set(gca,'Ytick',linspace(0,200,6)); set(gca, 'YTickLabel',linspace(0,2500,6));

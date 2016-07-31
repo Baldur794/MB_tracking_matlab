@@ -109,7 +109,7 @@ end
 % Calculate absolute velocity
 vel_abs_img = sqrt(vel_y.^2+vel_x.^2);
 % Correct for pixel resolution 
-vel_abs_img = vel_abs_img * 10*10^(-6)*fps*10^3;
+vel_abs_img = vel_abs_img; %* 10*10^(-6)*fps*10^3;
 
 % Color map for direction img
 colormap_vel_dir = hsv;
@@ -193,7 +193,7 @@ rgbImage = hsv2rgb(hsvImage);
 
 hold on
 % Position Colorwheel
-ac = axes('Position',[0.4740 0.1120 0.153 0.153]);
+ac = axes('Position',[0.4740 0.1120 0.703 0.153]);
 
 % Show colorwheel
 imshow(rgbImage);
@@ -293,4 +293,48 @@ ch = colorbar;
  ylabel(ch,'Velocity [mm/s]')
 
 
+%%
+% Scatter image from all MB locations
+MB_log_copy = MB_log;
+MB_index_list = [];
+
+for MB_index = 1:size(MB_log_copy,2)
+   if (MB_log_copy(MB_index).age(3) >= MB_age_condition) && (max(MB_log_copy(MB_index).count(:)) <= MB_count_condition)
+       MB_index_list = [MB_index_list, sub2ind([img_size(1:2)],MB_log_copy(MB_index).centroid(:,1) ,MB_log_copy(MB_index).centroid(:,2))'];
+   end
+end
+
+% scatter_matrix = zeros([img_size(1:2)]); 
+% for i = 1:size(MB_log_copy,2)
+%     scatter_matrix(MB_index_list(i)) = scatter_matrix(MB_index_list(i)) + 1;
+% end
+
+[MB_index_y MB_index_x] = ind2sub([img_size(:)]',MB_index_list); 
+phantom_index_y = (phantom_positions(:,3)-0.035)/0.03*630;
+phantom_index_x = (phantom_positions(:,1)+0.015)/0.03*600;
+
+% Make figure handle
+fig_h = figure; clf;
+% set position on screen
+set(fig_h,'position',[-1850 570 560 420]);
+
+% Show scatterplot with non-zero positions
+fig = scatter(MB_index_x, MB_index_y,'r');
+% hold on
+% scatter(phantom_index_x, phantom_index_y,'b');
+
+% Scatterplot settings
+set(fig,'SizeData', 3); % size of dots
+set(fig,'MarkerFacecolor','flat'); % appearance of dots
+
+xlabel('Lateral [mm]'); ylabel('Axial [mm]'); % title('Micro-Bubble image');
+% set(gca,'Xtick',linspace(0,1189,5)); set(gca, 'XTickLabel',linspace(0,12,5));
+% set(gca,'Ytick',linspace(0,2489,6)); set(gca, 'YTickLabel',linspace(0,25,6));
+% set(gca, 'DataAspectRatio',[1 1 1]) % set data aspect ratio in zoom box
+% set(gca, 'PlotBoxAspectRatio',[1 1 1])
+xlim([1 img_size(2)]);
+ylim([1 img_size(1)]);
+
+set(gca, 'YDir','reverse'); % reverse y-axis
+set(gca, 'Box','on');
 

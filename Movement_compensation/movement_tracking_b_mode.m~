@@ -32,7 +32,7 @@ max_mov_x = 5;
 
 fps = 50;
 frames = 1000;
-start_frame = 18;
+start_frame = 1;
 H = block_matching;
 H.max_mov_y = max_mov_y;
 H.max_mov_x = max_mov_x;
@@ -488,8 +488,8 @@ vel_y_grid = mov_y_grid;
 %% Velocity to vector list
 vel_x_grid = [];
 vel_y_grid = [];
-for idx_frame = 1:size(vel_y_mean_avg,2)
-    for idx = 1:size(vel_y_mean_avg,1)
+for idx_frame = 1:size(vel_y_mean,2)
+    for idx = 1:size(vel_y_mean,1)
         [x,y] = ind2sub(size(X),idx);
         vel_x_grid(idx_frame,x,y) = vel_x_mean_avg(idx,idx_frame);
         vel_y_grid(idx_frame,x,y) = vel_y_mean_avg(idx,idx_frame);
@@ -512,7 +512,7 @@ for i = 1:size(vel_y_grid,1)
     title(['Frame' num2str(i,'%d')]); 
     hold on
     % Quiver plot
-    q_plot = quiver(X,Y,squeeze(vel_x_grid(i,:,:))*5,squeeze(vel_y_grid(i,:,:))*20);
+    q_plot = quiver(X(:,1:5),Y(:,1:5),squeeze(vel_x_grid(i,:,1:5))*5,squeeze(vel_y_grid(i,:,1:5))*20);
 %     q_plot.AutoScaleFactor = 10;
     q_plot.MaxHeadSize = 0.3;
     q_plot.ShowArrowHead = 'on';
