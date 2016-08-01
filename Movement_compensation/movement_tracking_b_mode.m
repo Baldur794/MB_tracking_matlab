@@ -3,7 +3,7 @@
 % B_mode
 img_wind_cord = zeros(1,4);
 idx_wind = 1;
-for i = 1:1:5
+for i = 3:3:3
     img_wind_cord(idx_wind,:) = [500 900 130+i 130+i];
     idx_wind = idx_wind + 1;
 end
@@ -28,7 +28,7 @@ end
 %                  370,390,203,203];
 
 max_mov_y = 10;
-max_mov_x = 5;
+max_mov_x = 3;
 
 fps = 50;
 frames = 1000;
@@ -100,8 +100,8 @@ for idx_wind = 1:size(img_wind_cord,1)
 end
 
 %% Calculate movement (for variable ref img)
-% vel_x = mov_x;%----
-% vel_y = mov_y;%----
+vel_x = mov_x;%----
+vel_y = mov_y;%----
 vel_x = vel_x-repmat(mean(vel_x')',1,size(vel_x,2));
 vel_y = vel_y-repmat(mean(vel_y')',1,size(vel_y,2));
 mov_y = zeros(size(vel_y));
@@ -196,14 +196,14 @@ vel_xx = spline(1:size(vel_x,2),vel_x,1:1/interpolate_factor:size(vel_x,2));
     axial_vel_std = zeros(size(vel_yy,1),1);
     axial_vel_std = sqrt(axial_vel_var);
 
-    % Average of nearby lines
-    axial_vel_mean_avg = zeros(size(img_wind_cord,1)/rep_x,size(axial_vel_list,2)); 
-    for idx_wind = 1:size(img_wind_cord,1)/rep_x
-        axial_vel_mean_avg(idx_wind,:) = mean(axial_vel_mean(rep_x*(idx_wind-1)+1:rep_x*idx_wind,:));  
-    end
+%     % Average of nearby lines
+%     axial_vel_mean_avg = zeros(size(img_wind_cord,1)/rep_x,size(axial_vel_list,2)); 
+%     for idx_wind = 1:size(img_wind_cord,1)/rep_x
+%         axial_vel_mean_avg(idx_wind,:) = mean(axial_vel_mean(rep_x*(idx_wind-1)+1:rep_x*idx_wind,:));  
+%     end
     
     vel_y_mean = spline(linspace(1,f_rep/interpolate_factor,size(axial_vel_mean,2)),axial_vel_mean,1:f_rep/interpolate_factor);
-    vel_y_mean_avg = spline(linspace(1,f_rep/interpolate_factor,size(axial_vel_mean_avg,2)),axial_vel_mean_avg,1:f_rep/interpolate_factor);
+%     vel_y_mean_avg = spline(linspace(1,f_rep/interpolate_factor,size(axial_vel_mean_avg,2)),axial_vel_mean_avg,1:f_rep/interpolate_factor);
 
 
 % Lateral velocity list
@@ -249,14 +249,14 @@ vel_xx = spline(1:size(vel_x,2),vel_x,1:1/interpolate_factor:size(vel_x,2));
     lateral_vel_std = zeros(size(vel_xx,1),1);
     lateral_vel_std = sqrt(lateral_vel_var);
     
-    % Average of nearby lines
-    lateral_vel_mean_avg = zeros(size(img_wind_cord,1)/rep_x,size(lateral_vel_list,2)); 
-    for idx_wind = 1:size(img_wind_cord,1)/rep_x
-        lateral_vel_mean_avg(idx_wind,:) = mean(lateral_vel_mean(rep_x*(idx_wind-1)+1:rep_x*idx_wind,:));  
-    end
+%     % Average of nearby lines
+%     lateral_vel_mean_avg = zeros(size(img_wind_cord,1)/rep_x,size(lateral_vel_list,2)); 
+%     for idx_wind = 1:size(img_wind_cord,1)/rep_x
+%         lateral_vel_mean_avg(idx_wind,:) = mean(lateral_vel_mean(rep_x*(idx_wind-1)+1:rep_x*idx_wind,:));  
+%     end
     
     vel_x_mean = spline(linspace(1,f_rep/interpolate_factor,size(lateral_vel_mean,2)),lateral_vel_mean,1:f_rep/interpolate_factor);
-    vel_x_mean_avg = spline(linspace(1,f_rep/interpolate_factor,size(lateral_vel_mean_avg,2)),lateral_vel_mean_avg,1:f_rep/interpolate_factor);
+%     vel_x_mean_avg = spline(linspace(1,f_rep/interpolate_factor,size(lateral_vel_mean_avg,2)),lateral_vel_mean_avg,1:f_rep/interpolate_factor);
 
 
 
@@ -779,3 +779,145 @@ arrow_annotation.Position = [100 100 10 10];
 % % plot(abs(mov_x_comp(2,:)-mov_x(2,:)));
 % 
 
+%% Calculate movement (for variable ref img)
+vel_x_copy = vel_x_copy-repmat(mean(vel_x_copy')',1,size(vel_x_copy,2));
+vel_y_copy = vel_y_copy-repmat(mean(vel_y_copy')',1,size(vel_y_copy,2));
+mov_y_copy = zeros(size(vel_y_copy));
+mov_x_copy = zeros(size(vel_x_copy));
+
+for idx_wind = 1:size(vel_y_copy,1)
+    for idx_frame = start_frame:start_frame+size(mov_y_copy,2)-1;
+        mov_y_copy(idx_wind,idx_frame-start_frame+1) = sum(vel_y_copy(idx_wind,1:idx_frame-start_frame+1));
+        mov_x_copy(idx_wind,idx_frame-start_frame+1) = sum(vel_x_copy(idx_wind,1:idx_frame-start_frame+1));
+    end
+end
+mov_y_copy = mov_y_copy-repmat(mean(mov_y_copy')',1,size(mov_y_copy,2));
+mov_x_copy = mov_x_copy-repmat(mean(mov_x_copy')',1,size(mov_x_copy,2));
+%% Displacement multiple axial overlay
+  figure();
+for j = 1:size(mov_y_copy,1)
+    
+    subplot(size(mov_y_copy,1),1,j)
+    
+    hold on
+    
+    for i = 1:size(mov_y_copy,3)
+        plot((squeeze(mov_y_copy(j,:,i))));
+    end
+    hold off
+    ylim([-20,20]); %xlim([1 43]);
+    set(gca,'Xtick',linspace(1,1000,5)); set(gca,'XtickLabel',linspace(0,20,5));
+    set(gca,'Ytick',linspace(-20,20,5)); set(gca, 'YTickLabel',linspace(-250,250,5));
+end
+xlabel('Time (s)');
+subplot(size(mov_y_copy,1),1,3)
+ylabel('Axial displacement (\mum)');
+subplot(size(mov_y_copy,1),1,1)
+title('Axial displacement');
+
+%% Displacement multiple lateral overlay
+  figure();
+for j = 1:size(mov_x_copy,1)
+    
+    subplot(size(mov_x_copy,1),1,j)
+    
+    hold on
+    
+    for i = 1:size(mov_x_copy,3)
+        plot((squeeze(mov_x_copy(j,:,i))));
+    end
+    hold off
+    ylim([-20,20]); %xlim([1 43]);
+    set(gca,'Xtick',linspace(1,1000,5)); set(gca,'XtickLabel',linspace(0,20,5));
+    set(gca,'Ytick',linspace(-19,19,5)); set(gca, 'YTickLabel',linspace(-800,800,5));
+end
+xlabel('Time (s)');
+subplot(size(mov_y_copy,1),1,3)
+ylabel('Lateral displacement (\mum)');
+subplot(size(mov_y_copy,1),1,1)
+title('Lateral displacement');
+
+%% Displacement multiple axial overlay mean
+  figure();
+for j = 1:size(mov_y_comp,1)
+    
+    subplot(size(mov_y_comp,1),1,j)
+    
+    hold on
+    
+    for i = 1:size(mov_y_comp,3)
+        plot((squeeze(mov_y_comp(j,:,i))));
+    end
+    hold off
+    ylim([-2,8]); %xlim([1 43]);
+    set(gca,'Xtick',linspace(1,40,5)); set(gca,'XtickLabel',linspace(0,0.8,5));
+    set(gca,'Ytick',linspace(-2,8,5)); set(gca, 'YTickLabel',linspace(-64,64,5));
+end
+xlabel('Time (s)');
+subplot(size(mov_y_comp,1),1,3)
+ylabel('Axial displacement (\mum)');
+subplot(size(mov_y_comp,1),1,1)
+title('Axial displacement mean');
+
+%% Displacement multiple lateral overlay mean
+  figure();
+for j = 1:size(mov_x_comp,1)
+    
+    subplot(size(mov_x_comp,1),1,j)
+    
+    hold on
+    
+    for i = 1:size(mov_x_comp,3)
+        plot((squeeze(mov_x_comp(j,:,i))));
+    end
+    hold off
+    ylim([-2,1]); %xlim([1 43]);
+    set(gca,'Xtick',linspace(1,40,5)); set(gca,'XtickLabel',linspace(0,0.8,5));
+    set(gca,'Ytick',linspace(-2,1,5)); set(gca, 'YTickLabel',linspace(-64,64,5));
+end
+xlabel('Time (s)');
+subplot(size(mov_x_copy,1),1,3)
+ylabel('Lateral displacement (\mum)');
+subplot(size(mov_x_copy,1),1,1)
+title('Lateral displacement mean');
+
+
+%%
+%% Displacement multiple axial overlay mean
+  figure();
+for j = 1:5
+    
+    subplot(5,1,j)
+    
+    hold on
+    
+    for i = 1:size(mov_y_comp,3)
+        plot((squeeze(mov_y_comp(j,:,i))));
+    end
+    hold off
+    %ylim([-2,8]); %xlim([1 43]);
+    %set(gca,'Xtick',linspace(1,40,5)); set(gca,'XtickLabel',linspace(0,0.8,5));
+    %set(gca,'Ytick',linspace(-2,8,5)); set(gca, 'YTickLabel',linspace(-64,64,5));
+end
+
+%% Displacement multiple axial overlay mean
+  figure();
+for j = 1:5
+    
+    subplot(5,1,j)
+    
+    hold on
+    
+    for i = 1:size(mov_y_comp_avg,3)
+        plot((squeeze(mov_y_comp_avg(j,:,i))));
+    end
+    hold off
+    %ylim([-2,8]); %xlim([1 43]);
+    %set(gca,'Xtick',linspace(1,40,5)); set(gca,'XtickLabel',linspace(0,0.8,5));
+    %set(gca,'Ytick',linspace(-2,8,5)); set(gca, 'YTickLabel',linspace(-64,64,5));
+end
+%xlabel('Time (s)');
+%subplot(size(mov_y_copy,1),1,3)
+%ylabel('Axial displacement (\mum)');
+%subplot(size(mov_y_copy,1),1,1)
+%title('Axial displacement mean');

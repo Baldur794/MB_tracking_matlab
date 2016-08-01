@@ -2,13 +2,13 @@
 MB_window_coord_search = zeros(2,2); % Coordinates for search window
 MB_window_coord_search_clear = zeros(2,2); % Coordinates for search clear window
 
-MB_window_size_search_localization = [30 30]; % [y,x] Search window for localization of PSF's
-MB_window_size_search_new = [7 7]; % [y,x] Search window for new MB's
-MB_window_size_search_existing = [5 5]; % [y,x] Search window for ''old'' MB's
-MB_window_size_search_clear = [20 20]; % [y,x] Search window for ''old'' MB's
+MB_window_size_search_localization = [10 10]; % [y,x] Search window for localization of PSF's
+MB_window_size_search_new = [3 3]; % [y,x] Search window for new MB's
+MB_window_size_search_existing = [3 3]; % [y,x] Search window for ''old'' MB's
+MB_window_size_search_clear = [15 15]; % [y,x] Search window for ''old'' MB's
 
 
-MB_age_condition = 1;
+MB_age_condition = 60;
 MB_count_condition = 40; % Number of areas within search windows
 MB_window_size_density_avg = [5 3]; % Window for density condition
 MB_window_size_density_stuck = [10 10]; % Window for density condition
@@ -20,8 +20,8 @@ MB_dens_condition_single_avg = 0;
 MB_vel_mean_condition_x = 0;
 MB_vel_mean_condition_y = 0;
 MB_vel_variance_condition = 20; % Dont touch...
-MB_window_threshold = 2; % Window Threshold (actual MB_window_threshold = Max_intensity*1/threshold)
-weighing_factor = 1; % Distance weighing factor
+MB_window_threshold = 1.3; % Window Threshold (actual MB_window_threshold = Max_intensity*1/threshold)
+weighing_factor = 0; % Distance weighing factor
 weighing_filter_radius = 3; % Radius around centroid to be considered
 
 MB_window_out_of_bounce = 0; % Checks if search windows is outside image
@@ -30,10 +30,16 @@ fps = 47;
 n_bck_grnd = 10; 
 n_bck_grnd_skip =30;
 v_MB = 0.5*10^(-3);
-nframe = 100;
+nframe = 1000;
 idx_frame_start = 4000;
 img_size = [2489,1183];
 interpolation_type = 'spline';
+
+%----
+n = 20;
+Wn = 0.05;
+b = fir1(n,Wn);
+%----
 
 
 %%
@@ -52,6 +58,7 @@ MB_log = MB;
 
 
 img = load_img_contrast(1000,n_bck_grnd,n_bck_grnd_skip,0.5*10^-3);
+% img = img(15:end,:);%----------
 [X,Y] = meshgrid(1:size(img,2),1:size(img,1));
 [Xq,Yq] = meshgrid(1:1/19.7:size(img,2),1:1/5.1:size(img,1));
 
@@ -60,12 +67,21 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
     idx_frame
     % Load img
     img = load_img_contrast(idx_frame,n_bck_grnd,n_bck_grnd_skip,v_MB);
+%     img = img(15:end,:);%----------
     img = interp2(X,Y,img,Xq,Yq,interpolation_type);
 %     figure(); imagesc(img); colormap('gray');%---
     
+    
+    %----
+   img = filter(b,1,img,[],1);
+   img = img(n/2+1:end,:);
+    %---
+    
+    
+
     % Calculate threshold
     SEM = std(img(:));               
-    ts = tinv(0.9999999999,length(img(:))-1);     
+    ts = tinv(0.999999999,length(img(:))-1);     
     CI = mean(img(:)) + ts*SEM;
     global_threshold = CI;
     
@@ -120,59 +136,115 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
         if MB_window_coord_search(2,2) > size(img,2)
             MB_window_coord_search(2,2) = size(img,2);
             MB_window_out_of_bounce = 1;
-        end
-        
-        % Update clear window coordinates
-        MB_window_coord_search_clear(1,1) = MB(MB_index).new_pos(1)-MB_window_size_search_clear(1);
-        MB_window_coord_search_clear(2,1) = MB(MB_index).new_pos(1)+MB_window_size_search_clear(1);
-        MB_window_coord_search_clear(1,2) = MB(MB_index).new_pos(2)-MB_window_size_search_clear(2);
-        MB_window_coord_search_clear(2,2) = MB(MB_index).new_pos(2)+MB_window_size_search_clear(2);
-        
-        % Check for out of bounce
-        % y_start      
-        if MB_window_coord_search_clear(1,1) <= 0
-            MB_window_coord_search_clear(1,1) = 1;
-        end
-        % y_end
-        if MB_window_coord_search_clear(2,1) > size(img,1)
-            MB_window_coord_search_clear(2,1) = size(img,1);
-        end
-        % x_start
-        if MB_window_coord_search_clear(1,2) <= 0
-            MB_window_coord_search_clear(1,2) = 1;
-        end
-        % x_end
-        if MB_window_coord_search_clear(2,2) > size(img,2)
-            MB_window_coord_search_clear(2,2) = size(img,2);
-        end
+        end       
         
         % Create temp window
         img_temp_window = img_global_threshold(MB_window_coord_search(1,1):MB_window_coord_search(2,1),MB_window_coord_search(1,2):MB_window_coord_search(2,2));
         %figure(); imagesc(img_temp_window); colormap('gray');%--- 
+        %figure(); imagesc(img_global_threshold); colormap('gray');%--- 
         
          % Check if any blobs are within window
         if any(img_temp_window(:))
             
+            % Update window coordinates
+            if MB(MB_index).age(3) == 1
+                MB_window_coord_search(1,1) = MB(MB_index).new_pos(1)-MB_window_size_search_localization(1);
+                MB_window_coord_search(2,1) = MB(MB_index).new_pos(1)+MB_window_size_search_localization(1);
+                MB_window_coord_search(1,2) = MB(MB_index).new_pos(2)-MB_window_size_search_localization(2);
+                MB_window_coord_search(2,2) = MB(MB_index).new_pos(2)+MB_window_size_search_localization(2);      
+            else
+                MB_window_coord_search(1,1) = MB(MB_index).new_pos(1)-MB_window_size_search_localization(1)+MB(MB_index).vel(1);
+                MB_window_coord_search(2,1) = MB(MB_index).new_pos(1)+MB_window_size_search_localization(1)+MB(MB_index).vel(1);
+                MB_window_coord_search(1,2) = MB(MB_index).new_pos(2)-MB_window_size_search_localization(2)+MB(MB_index).vel(2);
+                MB_window_coord_search(2,2) = MB(MB_index).new_pos(2)+MB_window_size_search_localization(2)+MB(MB_index).vel(2); 
+            end
+            
+            % Check for out of bounce
+            % y_start
+            MB_window_out_of_bounce = 0;
+            if MB_window_coord_search(1,1) <= 0
+                MB_window_coord_search(1,1) = 1;               
+                MB_window_out_of_bounce = 1;
+            end
+            % y_end
+            if MB_window_coord_search(2,1) > size(img,1)
+                MB_window_coord_search(2,1) = size(img,1);
+                MB_window_out_of_bounce = 1;
+            end
+            % x_start
+            if MB_window_coord_search(1,2) <= 0
+                MB_window_coord_search(1,2) = 1;
+                MB_window_out_of_bounce = 1;
+            end
+            % x_end
+            if MB_window_coord_search(2,2) > size(img,2)
+                MB_window_coord_search(2,2) = size(img,2);
+                MB_window_out_of_bounce = 1;
+            end
+                      
             % Create temp window
             img_temp_window = img(MB_window_coord_search(1,1):MB_window_coord_search(2,1),MB_window_coord_search(1,2):MB_window_coord_search(2,2));
-            %figure(); imagesc(img_temp_window); colormap('gray');%---
+%             figure(); imagesc(img_temp_window); colormap('gray');%---
             
             % Find max intensity within window
             [max_int, max_index] = max(img_temp_window(:));
             [max_y_window, max_x_window] = ind2sub(size(img_temp_window), max_index);
             max_y = max_y_window + MB_window_coord_search(1,1)-1;
-            max_x = max_x_window + MB_window_coord_search(1,2)-1;          
-
+            max_x = max_x_window + MB_window_coord_search(1,2)-1;
+                                            
+            % Update window coordinates
+            MB_window_coord_search(1,1) = max_y-MB_window_size_search_localization(1);
+            MB_window_coord_search(2,1) = max_y+MB_window_size_search_localization(1);
+            MB_window_coord_search(1,2) = max_x-MB_window_size_search_localization(2);
+            MB_window_coord_search(2,2) = max_x+MB_window_size_search_localization(2);
+            
+            % Update clear window coordinates
+            MB_window_coord_search_clear(1,1) = max_y-MB_window_size_search_clear(1);
+            MB_window_coord_search_clear(2,1) = max_y+MB_window_size_search_clear(1);
+            MB_window_coord_search_clear(1,2) = max_x-MB_window_size_search_clear(2);
+            MB_window_coord_search_clear(2,2) = max_x+MB_window_size_search_clear(2);
+                        
+            % Check for out of bounce
+            % y_start
+            MB_window_out_of_bounce = 0;
+            if MB_window_coord_search(1,1) <= 0 || MB_window_coord_search_clear(1,1) <= 0
+                MB_window_coord_search(1,1) = 1;
+                MB_window_coord_search_clear(1,1) = 1;
+                MB_window_out_of_bounce = 1;
+            end
+            % y_end
+            if MB_window_coord_search(2,1) > size(img,1) || MB_window_coord_search_clear(2,1) > size(img,1)
+                MB_window_coord_search(2,1) = size(img,1);
+                MB_window_coord_search_clear(2,1) = size(img,1);
+                MB_window_out_of_bounce = 1;
+            end
+            % x_start
+            if MB_window_coord_search(1,2) <= 0 || MB_window_coord_search_clear(1,2) <= 0
+                MB_window_coord_search(1,2) = 1;
+                MB_window_coord_search_clear(1,2) = 1;
+                MB_window_out_of_bounce = 1;
+            end
+            % x_end
+            if MB_window_coord_search(2,2) > size(img,2) || MB_window_coord_search_clear(2,2) > size(img,2)
+                MB_window_coord_search(2,2) = size(img,2);
+                MB_window_coord_search_clear(2,2) = size(img,2);
+                MB_window_out_of_bounce = 1;
+            end
+                      
+            % Create temp window
+            img_temp_window = img(MB_window_coord_search(1,1):MB_window_coord_search(2,1),MB_window_coord_search(1,2):MB_window_coord_search(2,2));
+%             figure(); imagesc(img_temp_window); colormap('gray');%---
+            
             % Thresholding
-            img_temp_window(find(img_temp_window < max_int/MB_window_threshold)) = 0;
-            %figure(); imagesc(img_temp_window); colormap('gray');%---
+            img_temp_window(find(img_temp_window < max_int/MB_window_threshold | img_temp_window > max_int)) = 0;
+%             figure(); imagesc(img_temp_window); colormap('gray');%---
             
             % Count number of blobs in window from global img
             img_blob_label_global_window = img_blob_label_global(MB_window_coord_search_clear(1,1):MB_window_coord_search_clear(2,1),MB_window_coord_search_clear(1,2):MB_window_coord_search_clear(2,2));
             blobs_global_window = unique(img_blob_label_global_window);
             blobs_global_window(1) = [];
             blob_count_global_window = length(blobs_global_window);
-            %figure(); imagesc(img_blob_label_global_window); colormap('gray');%---
+%             figure(); imagesc(img_blob_label_global_window); colormap('gray');%---
             
             
             %figure(); imagesc(img_blob_label_global); colormap('gray');%---
@@ -294,9 +366,9 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
         %figure(); imagesc(img_temp_window); colormap('gray');%---
         
         % Thresholding
-        img_temp_window(find(img_temp_window < max_int/MB_window_threshold)) = 0;
-        figure(); imagesc(img_temp_window); colormap('gray');%---
-        
+        img_temp_window(find(img_temp_window < max_int/MB_window_threshold | img_temp_window > max_int)) = 0;
+%         figure(); imagesc(img_temp_window); colormap('gray');%---
+%         
         % Count number of blobs in window from global img
         img_blob_label_global_window = img_blob_label_global(MB_window_coord_search_clear(1,1):MB_window_coord_search_clear(2,1),MB_window_coord_search_clear(1,2):MB_window_coord_search_clear(2,2));
         blobs_global_window = unique(img_blob_label_global_window);
@@ -444,11 +516,12 @@ end
    
 %% Find MB from coordinates
 temp = [];
-coord = [315 486];
+coord = [389 854];
 for i = 1:size(MB_log,2)
     for j = 1:size(MB_log(i).centroid,1)
         if MB_log(i).centroid(j,1) == coord(2) && MB_log(i).centroid(j,2) == coord(1); 
             temp = [temp i]
+            MB_log(i).age
             break;
         end
     end
@@ -460,9 +533,9 @@ temp_x = MB_log(temp(1)).centroid(:,2);
 figure(); plot(temp_y)
 %figure(); plot(temp_x)te
 
-temp_y_fft = fft(temp_y-mean(temp_y));
-figure(); plot(linspace(0,fps/2,round(size(temp_y_fft,1)/2)),abs(temp_y_fft(1:round(size(temp_y_fft,1)/2)))); legend('1','2','3','4','5','6','7');  xlabel('Frequency (Hz)'); ylabel('Magnitude'); % title('Frequency spectrum of axial displacement');
-%temp_x_fft = fft(temp_x-mean(temp_x));
+ temp_y_fft = fft(temp_y-mean(temp_y));
+ figure(); plot(linspace(0,fps/2,round(size(temp_y_fft,1)/2)),abs(temp_y_fft(1:round(size(temp_y_fft,1)/2)))); legend('1','2','3','4','5','6','7');  xlabel('Frequency (Hz)'); ylabel('Magnitude'); % title('Frequency spectrum of axial displacement');
+% %temp_x_fft = fft(temp_x-mean(temp_x));
 %figure(); plot(linspace(0,fps/2,round(size(temp_x_fft,1)/2)),abs(temp_x_fft(1:round(size(temp_x_fft,1)/2)))); legend('1','2','3','4','5','6','7');  xlabel('Frequency (Hz)'); ylabel('Magnitude'); % title('Frequency spectrum of axial displacement');
 
 %%

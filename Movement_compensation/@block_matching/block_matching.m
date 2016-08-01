@@ -68,9 +68,15 @@ classdef block_matching
                 % Finds peak position
                 [max_y max_x] = peak_estimation(c_filt, 'max');
                 % Finds max correlation
-                %                 [max_y max_x] = find(c == max(c(:)));
-                motion_y = max_y(1)-obj.max_mov_y-1;
+%                 [max_y max_x] = find(c == max(c(:)));
+%                 motion_y = max_y(1)-obj.max_mov_y-1;
                 motion_x = max_x(1)-obj.max_mov_x-1;
+                %----
+                c_filt_axial = mean(c_filt');
+                [max_y max_x] = peak_estimation(c_filt_axial', 'max');
+                motion_y = max_y(1)-obj.max_mov_y-1;
+                %----
+                
             else
                 % Cost matrix
                 cost_matrix = zeros(size(img_ref,1)-size(img_new,1)+1,size(img_ref,2)-size(img_new,2)+1);
@@ -114,7 +120,7 @@ classdef block_matching
              
             % Load img
             if strcmp(mode,'b_mode')
-                img_ref = real(load_img_B_mode(idx_frame));%---------------------------
+                img_ref = abs(load_img_B_mode(idx_frame));%---------------------------
             elseif strcmp(mode,'contrast')
                 img_ref = abs(load_img_contrast(idx_frame,obj.n_fore_grnd,obj.n_fore_grnd,obj.n_bck_grnd_skip));
                 img_ref(img_avg == 0) = 0;
@@ -143,7 +149,7 @@ classdef block_matching
             
             % Load new img
             if strcmp(mode,'b_mode')
-                img_new = real(load_img_B_mode(idx_frame));%-------------------
+                img_new = abs(load_img_B_mode(idx_frame));%-------------------
             elseif strcmp(mode,'contrast')
                 img_new = abs(load_img_contrast(idx_frame,obj.n_fore_grnd,obj.n_fore_grnd,obj.n_bck_grnd_skip));
                 img_new(img_avg == 0) = 0;
@@ -184,11 +190,14 @@ function [peak_y peak_x] = peak_estimation(match_matrix, min_max)
     end
     x_m = x_m(1);
     y_m = y_m(1);
-    if (x_m == size(match_matrix,2)) || (x_m == 1) || (y_m == size(match_matrix,1)) || (y_m == 1)
+    if (x_m == size(match_matrix,2)) || (x_m == 1)
         peak_x = x_m;
-        peak_y = y_m;
     else
         peak_x = x_m-(match_matrix(y_m,x_m+1)-match_matrix(y_m,x_m-1))/(2*(match_matrix(y_m,x_m+1)-2*match_matrix(y_m,x_m)+match_matrix(y_m,x_m-1)));
+    end
+    if (y_m == size(match_matrix,1)) || (y_m == 1)
+        peak_y = y_m;
+    else
         peak_y = y_m-(match_matrix(y_m+1,x_m)-match_matrix(y_m-1,x_m))/(2*(match_matrix(y_m+1,x_m)-2*match_matrix(y_m,x_m)+match_matrix(y_m-1,x_m)));
     end
 end

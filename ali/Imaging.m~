@@ -279,6 +279,9 @@ end
 phantom_index_y = (phantom_positions(:,3)-0.035)/0.03*630;
 phantom_index_x = (phantom_positions(:,1)+0.015)/0.03*600;
 
+phantom_index_y = phantom_positions(:,3)/0.03*630+630/0.03*1/2;
+phantom_index_x = phantom_positions(:,1)/0.015*600+600/0.03*1/2;
+
 % Make figure handle
 fig_h = figure; clf;
 % set position on screen

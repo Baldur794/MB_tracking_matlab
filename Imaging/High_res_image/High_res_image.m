@@ -561,3 +561,40 @@ figure(); imagesc(img_m);
 xlabel('Time (s)'); ylabel('Axial (\mum)'); % title('Micro-Bubble image');
 set(gca,'Xtick',linspace(0,400,9)); set(gca, 'XTickLabel',linspace(0,8,9));
 set(gca,'Ytick',linspace(0,200,6)); set(gca, 'YTickLabel',linspace(0,2500,6));
+
+%% 
+% Scatter image from all MB locations
+MB_log_copy = MB_log;
+MB_index_list = [];
+
+for MB_index = 1:size(MB_log_copy,2)
+%    if (MB_log_copy(MB_index).age(3) >= MB_age_condition) && (max(MB_log_copy(MB_index).count(:)) <= MB_count_condition)
+       MB_index_list = [MB_index_list, sub2ind([img_size(1:2)],MB_log_copy(MB_index).centroid(:,1) ,MB_log_copy(MB_index).centroid(:,2))'];
+%    end
+end
+
+[MB_index_y MB_index_x] = ind2sub([img_size(:)]',MB_index_list); 
+
+% Make figure handle
+fig_h = figure; clf;
+% set position on screen
+set(fig_h,'position',[-1850 570 560 420]);
+
+% Show scatterplot with non-zero positions
+fig_tracked = scatter(MB_index_x, MB_index_y,'r');
+set(fig_tracked,'SizeData', 3); % size of dots
+set(fig_tracked,'MarkerFacecolor','flat'); % appearance of dots
+
+
+
+xlabel('Lateral [mm]'); ylabel('Axial [mm]'); % title('Micro-Bubble image');
+% set(gca,'Ytick',linspace(1,630,7)); set(gca, 'YTickLabel',linspace(0.035,0.065,7));
+% set(gca,'Xtick',linspace(1,600,7)); set(gca, 'XTickLabel',linspace(-0.015,0.015,7));
+% set(gca, 'DataAspectRatio',[1 1 1]) % set data aspect ratio in zoom box
+% set(gca, 'PlotBoxAspectRatio',[1 1 1])
+xlim([1 img_size(2)]);
+ylim([1 img_size(1)]);
+
+set(gca, 'YDir','reverse'); % reverse y-axis
+set(gca, 'Box','on');
+

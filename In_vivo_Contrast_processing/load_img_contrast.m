@@ -51,7 +51,7 @@ end
 load([filename num2str(idx_seq,'%d') '.mat'],'img');
 %fore_grnd_img = img(1:img_size(1),1:img_size(2));
 fore_grnd_img = abs(filt_img-bck_grnd_img);
-%fore_grnd_img = bck_grnd_img
+% fore_grnd_img = abs(filt_img);
 
 
 
