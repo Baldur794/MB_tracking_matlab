@@ -68,8 +68,13 @@ destroy(job);
 %%
 %Check correct index
 for i = 1:size(data,2)
+    if isempty(data{1,i})
+        disp(['Missing index ' num2str(i,'%d')])
+        data{1,i} = data{1,i-1};
+        data{1,i}{1,1}{3} = data{1,i}{1,1}{3}+1;
+    end
     if data{1,i}{1,1}{3} ~= i
-        error('Index not correct')
+        disp(['Index ' num2str(i,'%d') ' not correct'])
     end
 end
 

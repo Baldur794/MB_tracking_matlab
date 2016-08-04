@@ -3,7 +3,7 @@
 % B_mode
 img_wind_cord = zeros(1,4);
 idx_wind = 1;
-for i = 3:3:3
+for i = 1:1:5
     img_wind_cord(idx_wind,:) = [500 900 130+i 130+i];
     idx_wind = idx_wind + 1;
 end
@@ -77,7 +77,7 @@ for idx_wind = 1:size(img_wind_cord,1)
         img_ref_wind = H.img_reference_window(idx_frame, idx_wind, mode);
         % Repeat for all frames
         for idx_frame = start_frame:start_frame+frames-1;
-            %         % Load ref img
+            % Load ref img
             img_ref_wind = H.img_reference_window(idx_frame, idx_wind, mode);
             
             % Load new img
@@ -100,8 +100,8 @@ for idx_wind = 1:size(img_wind_cord,1)
 end
 
 %% Calculate movement (for variable ref img)
-vel_x = mov_x;%----
-vel_y = mov_y;%----
+% vel_x = mov_x;%----
+% vel_y = mov_y;%----
 vel_x = vel_x-repmat(mean(vel_x')',1,size(vel_x,2));
 vel_y = vel_y-repmat(mean(vel_y')',1,size(vel_y,2));
 mov_y = zeros(size(vel_y));
@@ -130,12 +130,20 @@ end
 mov_y_comp_avg = zeros(size(vel_y_mean_avg,1),size(vel_y_mean_avg,2)+1);
 mov_x_comp_avg = zeros(size(vel_x_mean_avg,1),size(vel_x_mean_avg,2)+1);
 
-for idx_wind = 1:size(img_wind_cord,1)/rep_x
+for idx_wind = 1:size(mov_y_comp_avg,1)
     for idx_frame = start_frame:start_frame+size(mov_y_comp_avg,2)-2;
         mov_y_comp_avg(idx_wind,idx_frame-start_frame+2) = sum(vel_y_mean_avg(idx_wind,1:idx_frame-start_frame+1));
         mov_x_comp_avg(idx_wind,idx_frame-start_frame+2) = sum(vel_x_mean_avg(idx_wind,1:idx_frame-start_frame+1));
     end
 end 
+idx_contrast = sub2ind(size(X),7,5);
+mov_y_comp_contrast = [];
+mov_x_comp_contrast = [];
+mov_y_comp_contrast = mov_y_comp_avg(idx_contrast,:)*51/12.8;
+mov_x_comp_contrast = mov_x_comp_avg(idx_contrast,:)*197/43;
+mov_y_comp_contrast = mov_y_comp_contrast(1,4:end);
+mov_x_comp_contrast = mov_x_comp_contrast(1,4:end);
+figure();crosscorr(test,mov_y_comp_contrast,600);
 
 %% Calculate fft
 mov_y_frq = [];
@@ -149,114 +157,118 @@ for idx_wind = 1:size(img_wind_cord,1)
 end
 
 %% Interpolate velocity
-interpolate_factor = 11.51;
+interpolate_factor = 10;
+f_rep = 429;
+rep_factor = 25;
 vel_yy = spline(1:size(vel_y,2),vel_y,1:1/interpolate_factor:size(vel_y,2));
 vel_xx = spline(1:size(vel_x,2),vel_x,1:1/interpolate_factor:size(vel_x,2));
 
 
 % Axial velocity list
-    f_rep = 493;
-    axial_vel_list = zeros(size(vel_y,1),f_rep,floor(size(vel_yy,2)/f_rep));
-    
-    for idx_wind = 1:size(vel_yy,1)
-        for i = 1:size(axial_vel_list,2)
-            for k = 1:size(axial_vel_list,3)
-                index = size(axial_vel_list,2) * (k-1) + i;
-                axial_vel_list(idx_wind,i,k) = vel_yy(idx_wind,index);
-            end
-        end
-    end
-    
-    % Remove mean
-    for idx_wind = 1:size(vel_yy,1)
-        for k = 1:size(axial_vel_list,3)
-            axial_vel_list(idx_wind,:,k) = axial_vel_list(idx_wind,:,k)-mean(axial_vel_list(idx_wind,:,k));
-        end
-    end
-    
-    % Recreated velocity list
-    vel_yy_zero_mean = zeros(size(vel_yy));
-    for idx_wind = 1:size(vel_yy,1)
-        for k = 1:size(axial_vel_list,3)
-            vel_yy_zero_mean(idx_wind,size(axial_vel_list,2)*(k-1)+1:size(axial_vel_list,2)*k) = axial_vel_list(idx_wind,:,k);
-        end
-    end
-    
-    % Axial mean
-    axial_vel_mean = zeros(size(img_wind_cord,1),size(axial_vel_list,2));
-    axial_vel_mean = mean(axial_vel_list,3);
-    
-    % Axial variance
-    axial_vel_var = zeros(size(vel_yy,1),1);
-    for idx_temp = 1:size(vel_y,1)
-        axial_vel_var(idx_temp) = sum(var(axial_vel_list(idx_temp,:,:),1,3))/size(axial_vel_list,2);
-    end
-    %
-    % Axial std
-    axial_vel_std = zeros(size(vel_yy,1),1);
-    axial_vel_std = sqrt(axial_vel_var);
+axial_vel_list = zeros(size(vel_y,1),f_rep,floor(size(vel_yy,2)/f_rep));
 
-%     % Average of nearby lines
-%     axial_vel_mean_avg = zeros(size(img_wind_cord,1)/rep_x,size(axial_vel_list,2)); 
-%     for idx_wind = 1:size(img_wind_cord,1)/rep_x
-%         axial_vel_mean_avg(idx_wind,:) = mean(axial_vel_mean(rep_x*(idx_wind-1)+1:rep_x*idx_wind,:));  
-%     end
-    
-    vel_y_mean = spline(linspace(1,f_rep/interpolate_factor,size(axial_vel_mean,2)),axial_vel_mean,1:f_rep/interpolate_factor);
-%     vel_y_mean_avg = spline(linspace(1,f_rep/interpolate_factor,size(axial_vel_mean_avg,2)),axial_vel_mean_avg,1:f_rep/interpolate_factor);
+for idx_wind = 1:size(vel_yy,1)
+    for i = 1:size(axial_vel_list,2)
+        for k = 1:size(axial_vel_list,3)
+            index = size(axial_vel_list,2) * (k-1) + i;
+            axial_vel_list(idx_wind,i,k) = vel_yy(idx_wind,index);
+        end
+    end
+end
+
+% Remove mean
+for idx_wind = 1:size(vel_yy,1)
+    for k = 1:size(axial_vel_list,3)
+        axial_vel_list(idx_wind,:,k) = axial_vel_list(idx_wind,:,k)-mean(axial_vel_list(idx_wind,:,k));
+    end
+end
+
+% Recreated velocity list
+vel_yy_zero_mean = zeros(size(vel_yy));
+for idx_wind = 1:size(vel_yy,1)
+    for k = 1:size(axial_vel_list,3)
+        vel_yy_zero_mean(idx_wind,size(axial_vel_list,2)*(k-1)+1:size(axial_vel_list,2)*k) = axial_vel_list(idx_wind,:,k);
+    end
+end
+
+% Axial mean
+axial_vel_mean = zeros(size(img_wind_cord,1),size(axial_vel_list,2));
+axial_vel_mean = mean(axial_vel_list,3);
+
+% Axial variance
+axial_vel_var = zeros(size(vel_yy,1),1);
+for idx_temp = 1:size(vel_y,1)
+    axial_vel_var(idx_temp) = sum(var(axial_vel_list(idx_temp,:,:),1,3))/size(axial_vel_list,2);
+end
+%
+% Axial std
+axial_vel_std = zeros(size(vel_yy,1),1);
+axial_vel_std = sqrt(axial_vel_var);
+
+% Average of nearby lines
+axial_vel_mean_avg = zeros(size(axial_vel_mean,1)/rep_x,size(axial_vel_list,2));
+for idx_wind = 1:size(axial_vel_mean,1)/rep_x
+    axial_vel_mean_avg(idx_wind,:) = mean(axial_vel_mean(rep_x*(idx_wind-1)+1:rep_x*idx_wind,:));
+end
+
+axial_vel_mean_avg = repmat(axial_vel_mean_avg,1,rep_factor);
+
+vel_y_mean = spline(linspace(1,f_rep/interpolate_factor,size(axial_vel_mean,2)),axial_vel_mean,1:f_rep/interpolate_factor);
+vel_y_mean_avg = spline(linspace(1,f_rep/interpolate_factor*rep_factor,size(axial_vel_mean_avg,2)),axial_vel_mean_avg,1:f_rep/interpolate_factor*rep_factor);
 
 
 % Lateral velocity list
-    f_rep = 493;
-    lateral_vel_list = zeros(idx_wind,f_rep,floor(size(vel_xx,2)/f_rep));
-    
-    for idx_wind = 1:size(vel_yy,1)
-        for i = 1:size(lateral_vel_list,2)
-            for k = 1:size(lateral_vel_list,3)
-                index = size(lateral_vel_list,2) * (k-1) + i;
-                lateral_vel_list(idx_wind,i,k) = vel_xx(idx_wind,index);
-            end
-        end
-    end
-    
-    % Remove mean
-    for idx_wind = 1:size(vel_yy,1)
+lateral_vel_list = zeros(idx_wind,f_rep,floor(size(vel_xx,2)/f_rep));
+
+for idx_wind = 1:size(vel_yy,1)
+    for i = 1:size(lateral_vel_list,2)
         for k = 1:size(lateral_vel_list,3)
-            lateral_vel_list(idx_wind,:,k) = lateral_vel_list(idx_wind,:,k)-mean(lateral_vel_list(idx_wind,:,k));
+            index = size(lateral_vel_list,2) * (k-1) + i;
+            lateral_vel_list(idx_wind,i,k) = vel_xx(idx_wind,index);
         end
     end
-    
-    % Recreated velocity list
-    vel_xx_zero_mean = zeros(size(vel_xx));
-    for idx_wind = 1:size(vel_xx,1)
-        for k = 1:size(axial_vel_list,3)
-            vel_xx_zero_mean(idx_wind,size(axial_vel_list,2)*(k-1)+1:size(axial_vel_list,2)*k) = axial_vel_list(idx_wind,:,k);
-        end
+end
+
+% Remove mean
+for idx_wind = 1:size(vel_yy,1)
+    for k = 1:size(lateral_vel_list,3)
+        lateral_vel_list(idx_wind,:,k) = lateral_vel_list(idx_wind,:,k)-mean(lateral_vel_list(idx_wind,:,k));
     end
-    
-    
-    % lateral mean
-    lateral_vel_mean = zeros(size(vel_xx,1),size(lateral_vel_list,2));
-    lateral_vel_mean = mean(lateral_vel_list,3);
-    
-    % lateral variance
-    lateral_vel_var = zeros(size(vel_xx,1),1);
-    for idx_temp = 1:size(vel_xx,1)
-        lateral_vel_var(idx_temp) = sum(var(lateral_vel_list(idx_temp,:,:),1,3))/size(lateral_vel_list,2);
+end
+
+% Recreated velocity list
+vel_xx_zero_mean = zeros(size(vel_xx));
+for idx_wind = 1:size(vel_xx,1)
+    for k = 1:size(axial_vel_list,3)
+        vel_xx_zero_mean(idx_wind,size(axial_vel_list,2)*(k-1)+1:size(axial_vel_list,2)*k) = axial_vel_list(idx_wind,:,k);
     end
-    %
-    % lateral std
-    lateral_vel_std = zeros(size(vel_xx,1),1);
-    lateral_vel_std = sqrt(lateral_vel_var);
-    
-%     % Average of nearby lines
-%     lateral_vel_mean_avg = zeros(size(img_wind_cord,1)/rep_x,size(lateral_vel_list,2)); 
-%     for idx_wind = 1:size(img_wind_cord,1)/rep_x
-%         lateral_vel_mean_avg(idx_wind,:) = mean(lateral_vel_mean(rep_x*(idx_wind-1)+1:rep_x*idx_wind,:));  
-%     end
-    
-    vel_x_mean = spline(linspace(1,f_rep/interpolate_factor,size(lateral_vel_mean,2)),lateral_vel_mean,1:f_rep/interpolate_factor);
-%     vel_x_mean_avg = spline(linspace(1,f_rep/interpolate_factor,size(lateral_vel_mean_avg,2)),lateral_vel_mean_avg,1:f_rep/interpolate_factor);
+end
+
+
+% lateral mean
+lateral_vel_mean = zeros(size(vel_xx,1),size(lateral_vel_list,2));
+lateral_vel_mean = mean(lateral_vel_list,3);
+
+% lateral variance
+lateral_vel_var = zeros(size(vel_xx,1),1);
+for idx_temp = 1:size(vel_xx,1)
+    lateral_vel_var(idx_temp) = sum(var(lateral_vel_list(idx_temp,:,:),1,3))/size(lateral_vel_list,2);
+end
+%
+% lateral std
+lateral_vel_std = zeros(size(vel_xx,1),1);
+lateral_vel_std = sqrt(lateral_vel_var);
+
+% Average of nearby lines
+lateral_vel_mean_avg = zeros(size(lateral_vel_mean,1)/rep_x,size(lateral_vel_list,2));
+for idx_wind = 1:size(lateral_vel_mean,1)/rep_x
+    lateral_vel_mean_avg(idx_wind,:) = mean(lateral_vel_mean(rep_x*(idx_wind-1)+1:rep_x*idx_wind,:));
+end
+
+lateral_vel_mean_avg = repmat(lateral_vel_mean_avg,1,rep_factor);
+
+vel_x_mean = spline(linspace(1,f_rep/interpolate_factor,size(lateral_vel_mean,2)),lateral_vel_mean,1:f_rep/interpolate_factor);
+vel_x_mean_avg = spline(linspace(1,f_rep/interpolate_factor*rep_factor,size(lateral_vel_mean_avg,2)),lateral_vel_mean_avg,1:f_rep/interpolate_factor*rep_factor);
 
 
 
@@ -778,64 +790,6 @@ arrow_annotation.Position = [100 100 10 10];
 % % figure();
 % % plot(abs(mov_x_comp(2,:)-mov_x(2,:)));
 % 
-
-%% Calculate movement (for variable ref img)
-vel_x_copy = vel_x_copy-repmat(mean(vel_x_copy')',1,size(vel_x_copy,2));
-vel_y_copy = vel_y_copy-repmat(mean(vel_y_copy')',1,size(vel_y_copy,2));
-mov_y_copy = zeros(size(vel_y_copy));
-mov_x_copy = zeros(size(vel_x_copy));
-
-for idx_wind = 1:size(vel_y_copy,1)
-    for idx_frame = start_frame:start_frame+size(mov_y_copy,2)-1;
-        mov_y_copy(idx_wind,idx_frame-start_frame+1) = sum(vel_y_copy(idx_wind,1:idx_frame-start_frame+1));
-        mov_x_copy(idx_wind,idx_frame-start_frame+1) = sum(vel_x_copy(idx_wind,1:idx_frame-start_frame+1));
-    end
-end
-mov_y_copy = mov_y_copy-repmat(mean(mov_y_copy')',1,size(mov_y_copy,2));
-mov_x_copy = mov_x_copy-repmat(mean(mov_x_copy')',1,size(mov_x_copy,2));
-%% Displacement multiple axial overlay
-  figure();
-for j = 1:size(mov_y_copy,1)
-    
-    subplot(size(mov_y_copy,1),1,j)
-    
-    hold on
-    
-    for i = 1:size(mov_y_copy,3)
-        plot((squeeze(mov_y_copy(j,:,i))));
-    end
-    hold off
-    ylim([-20,20]); %xlim([1 43]);
-    set(gca,'Xtick',linspace(1,1000,5)); set(gca,'XtickLabel',linspace(0,20,5));
-    set(gca,'Ytick',linspace(-20,20,5)); set(gca, 'YTickLabel',linspace(-250,250,5));
-end
-xlabel('Time (s)');
-subplot(size(mov_y_copy,1),1,3)
-ylabel('Axial displacement (\mum)');
-subplot(size(mov_y_copy,1),1,1)
-title('Axial displacement');
-
-%% Displacement multiple lateral overlay
-  figure();
-for j = 1:size(mov_x_copy,1)
-    
-    subplot(size(mov_x_copy,1),1,j)
-    
-    hold on
-    
-    for i = 1:size(mov_x_copy,3)
-        plot((squeeze(mov_x_copy(j,:,i))));
-    end
-    hold off
-    ylim([-20,20]); %xlim([1 43]);
-    set(gca,'Xtick',linspace(1,1000,5)); set(gca,'XtickLabel',linspace(0,20,5));
-    set(gca,'Ytick',linspace(-19,19,5)); set(gca, 'YTickLabel',linspace(-800,800,5));
-end
-xlabel('Time (s)');
-subplot(size(mov_y_copy,1),1,3)
-ylabel('Lateral displacement (\mum)');
-subplot(size(mov_y_copy,1),1,1)
-title('Lateral displacement');
 
 %% Displacement multiple axial overlay mean
   figure();

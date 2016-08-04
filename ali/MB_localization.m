@@ -3,19 +3,19 @@ MB_window_coord_search = zeros(2,2); % Coordinates for search window
 MB_window_coord_search_clear = zeros(2,2); % Coordinates for search clear window
 
 MB_window_size_search_localization = [7 7]; % [y,x] Search window for localization of PSF's
-MB_window_size_search_new = [7 7]; % [y,x] Search window for new MB's
-MB_window_size_search_existing = [7 7]; % [y,x] Search window for ''old'' MB's
-MB_window_size_search_clear = [7 7]; % [y,x] Search window for ''old'' MB's
+MB_window_size_search_new = MB_window_size_search_localization;%[7 7]; % [y,x] Search window for new MB's
+MB_window_size_search_existing = MB_window_size_search_localization;%[7 7]; % [y,x] Search window for ''old'' MB's
+MB_window_size_search_clear = MB_window_size_search_localization;%[7 7]; % [y,x] Search window for ''old'' MB's
 
 MB_age_condition = 0;
 MB_count_condition = 40; % Number of areas within search windows
 MB_window_threshold = 2; % Window Threshold (actual MB_window_threshold = Max_intensity*1/threshold)
-weighing_factor = 2; % Distance weighing factor
-weighing_filter_radius = 3; % Radius around centroid to be considered
+weighing_factor = 0; % Distance weighing factor
+weighing_filter_radius = 10; % Radius around centroid to be considered
 
 MB_window_out_of_bounce = 0; % Checks if search windows is outside image
 
-nframe = 1;
+nframe = 20;
 idx_frame_start = 1;
 img_size = [630,600];
 
@@ -44,7 +44,7 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe-1
     img = abs(im_DAS);
     %figure(); imagesc(img); colormap('gray');%--- 
     
-    global_threshold = max(img(:)/10);
+    global_threshold = max(img(:)/5);
     
     % Threshold
     img_global_threshold = img;
@@ -345,76 +345,18 @@ toc
 
 
 
-%% Find MB from coordinates
-temp = [];
-coord = [125 134];
-for i = 1:size(MB_log,2)
-    for j = 1:size(MB_log(i).centroid,1)
-        if MB_log(i).centroid(j,1) == coord(2) && MB_log(i).centroid(j,2) == coord(1); 
-            temp = [temp i]
-            break;
-        end
-    end
-end
-
-%% Plot MB path and frequency response
-temp_y = MB_log(temp(1)).centroid(:,1);
-temp_x = MB_log(temp(1)).centroid(:,2);
-figure(); plot(temp_y)
-%figure(); plot(temp_x)te
-
-temp_y_fft = fft(temp_y-mean(temp_y));
-figure(); plot(linspace(0,fps/2,round(size(temp_y_fft,1)/2)),abs(temp_y_fft(1:round(size(temp_y_fft,1)/2)))); legend('1','2','3','4','5','6','7');  xlabel('Frequency (Hz)'); ylabel('Magnitude'); % title('Frequency spectrum of axial displacement');
-%temp_x_fft = fft(temp_x-mean(temp_x));
-%figure(); plot(linspace(0,fps/2,round(size(temp_x_fft,1)/2)),abs(temp_x_fft(1:round(size(temp_x_fft,1)/2)))); legend('1','2','3','4','5','6','7');  xlabel('Frequency (Hz)'); ylabel('Magnitude'); % title('Frequency spectrum of axial displacement');
-
-%%
-outputVideo=VideoWriter('contrast_video_clean_log_35');
-outputVideo.FrameRate=2;
-open(outputVideo);
-mov(1:50)= struct('cdata',[],'colormap',[]);
-pause(0.3)    
-for idx_frame = 4026:4046
-    
-     % Load img
-    img = load_img_contrast(idx_frame,n_bck_grnd,n_bck_grnd_skip,v_MB);
-%    img = abs(interp2(X,Y,img,Xq,Yq,interpolation_type));
-    %img = img(15:end,:);
-    
-%     % Calculate threshold
-%     SEM = std(img(:));               
-%     ts = tinv(0.9999999999,length(img(:))-1);     
-%     CI = mean(img(:)) + ts*SEM;
-%     global_threshold = CI;
-    
-%     img_global_threshold = img;
-%     img_global_threshold(img_global_threshold < global_threshold) = 0;
-    
-    %img = load_img_contrast(idx_frame,n_bck_grnd,n_bck_grnd_skip,v_MB);
-    pause(0.3)
-%     figure(4); plot(img);
-%     ylim([0 100]);
-    figure(2); imagesc(20*log10(img/max(img(:))), [-35 0]); colormap('gray');
-%     figure(2); imagesc(img_global_threshold); colormap('gray');    
-    xlabel('Lateral [mm]'); ylabel('Axial [mm]'); % title('Micro-Bubble image');
-    set(gca,'Xtick',linspace(0,size(img,2),5)); set(gca, 'XTickLabel',linspace(0,12,5));
-    set(gca,'Ytick',linspace(0,size(img,1),6)); set(gca, 'YTickLabel',linspace(0,25,6));
-    set(gca, 'DataAspectRatio',[1 4 1]) % set data aspect ratio in zoom box
-    set(gca, 'PlotBoxAspectRatio',[1 1 1])
-    
-    mov=getframe(gcf);
-    writeVideo(outputVideo,mov.cdata);
-
-    
-    
-%     norm = max(img_avg(:));
-%     limg_avg = 20*log10(img_avg/norm);
-%     figure(); imagesc(limg_avg,[-40 0]); colormap(gray);
-end
-close(gcf)
-close(outputVideo);
-
-
+% %% Find MB from coordinates
+% temp = [];
+% coord = [125 134];
+% for i = 1:size(MB_log,2)
+%     for j = 1:size(MB_log(i).centroid,1)
+%         if MB_log(i).centroid(j,1) == coord(2) && MB_log(i).centroid(j,2) == coord(1); 
+%             temp = [temp i]
+%             break;
+%         end
+%     end
+% end
+% 
 
 
 
