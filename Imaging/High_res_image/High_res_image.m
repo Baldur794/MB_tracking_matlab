@@ -550,6 +550,33 @@ ch = colorbar;
 
  
  %% M mode image
+ load([filename num2str(1,'%d') '.mat']);
+ img = abs(hilbert(img));
+ norm=max(img(:));
+ limg=20*log10(img/norm);
+ drange=max(limg(:))+[-60 0];
+ figure(); imagesc(limg, drange); colormap('gray');
+%%
+filename = '/data/cfudata6/s134082/Bachelorprojekt/micro_bubble_data/mat_files/wire_phantom/2016_08_03_12_35_10_bmode/frame_';
+filename = '/data/cfudata6/s134082/Bachelorprojekt/micro_bubble_data/mat_files/contrast_phantom/2016_08_03_11_49_16_bmode/frame_';
+filename = '/data/cfudata6/s134082/Bachelorprojekt/micro_bubble_data/mat_files/wire_phantom/2016_08_03_12_36_41_contrast/frame_';
+
+% filename = '/home/s134082/Desktop/Test/frame_';
+
+img_m = zeros(201,101);
+for i = 1:100 
+    load([filename num2str(i,'%d') '.mat']);
+    img = real(hilbert(img));
+    img_line = img(100:300,100:100);
+    crosscorr(img_line(2:2:end),img_line2(2:2:end))
+    img_m(:,i) = img_line;
+end
+figure(); imagesc(img_m);
+% xlabel('Time (s)'); ylabel('Axial (\mum)'); % title('Micro-Bubble image');
+% set(gca,'Xtick',linspace(0,400,9)); set(gca, 'XTickLabel',linspace(0,8,9));
+% set(gca,'Ytick',linspace(0,200,6)); set(gca, 'YTickLabel',linspace(0,2500,6));
+
+ %% M mode image
  
  img_m = zeros(201,401);
 for i = 1:400 

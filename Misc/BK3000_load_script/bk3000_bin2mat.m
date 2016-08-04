@@ -1,9 +1,9 @@
-%folder='/data/cfudata7/cavh/phantoms/microbubble_BK/first_experiment/data/2016_04_21_14_06_41'; % Contrast
+% folder='/data/cfudata7/cavh/phantoms/microbubble_BK/first_experiment/data/2016_04_21_14_32_21'; % Contrast
 
 folder='/data/cfudata7/cavh/phantoms/microbubble_BK/first_experiment/data/2016_04_21_14_32_21'; % B-mode
 
 
-% % Contrast mode
+% Contrast mode
 % no_lines=123;
 % file_size=168264;
 
@@ -56,7 +56,7 @@ while run
     
     frame=frame+1;
     pause(1/30)
-    save(['/data/cfudata6/s134082/Bachelorprojekt/micro_bubble_data/mat_files/2016_04_21_14_32_21/frame_' sprintf('%d',frame) '.mat'], 'img')
+    save(['/home/s134082/Desktop/Test/frame_' sprintf('%d',frame) '.mat'], 'img')
 end
 
 fprintf('Processed %d frames\n', frame-frame_skip_limit);

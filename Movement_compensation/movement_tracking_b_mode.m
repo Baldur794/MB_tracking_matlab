@@ -4,7 +4,7 @@
 img_wind_cord = zeros(1,4);
 idx_wind = 1;
 for i = 1:1:5
-    img_wind_cord(idx_wind,:) = [500 900 130+i 130+i];
+    img_wind_cord(idx_wind,:) = [250 450 130+i 130+i];
     idx_wind = idx_wind + 1;
 end
 
@@ -31,7 +31,7 @@ max_mov_y = 10;
 max_mov_x = 3;
 
 fps = 50;
-frames = 1000;
+frames = 250;
 start_frame = 18;
 H = block_matching;
 H.max_mov_y = max_mov_y;
@@ -136,14 +136,14 @@ for idx_wind = 1:size(mov_y_comp_avg,1)
         mov_x_comp_avg(idx_wind,idx_frame-start_frame+2) = sum(vel_x_mean_avg(idx_wind,1:idx_frame-start_frame+1));
     end
 end 
-idx_contrast = sub2ind(size(X),7,5);
-mov_y_comp_contrast = [];
-mov_x_comp_contrast = [];
-mov_y_comp_contrast = mov_y_comp_avg(idx_contrast,:)*51/12.8;
-mov_x_comp_contrast = mov_x_comp_avg(idx_contrast,:)*197/43;
-mov_y_comp_contrast = mov_y_comp_contrast(1,4:end);
-mov_x_comp_contrast = mov_x_comp_contrast(1,4:end);
-figure();crosscorr(test,mov_y_comp_contrast,600);
+% idx_contrast = sub2ind(size(X),7,5);
+% mov_y_comp_contrast = [];
+% mov_x_comp_contrast = [];
+% mov_y_comp_contrast = mov_y_comp_avg(idx_contrast,:)*51/12.8;
+% mov_x_comp_contrast = mov_x_comp_avg(idx_contrast,:)*197/43;
+% mov_y_comp_contrast = mov_y_comp_contrast(1,4:end);
+% mov_x_comp_contrast = mov_x_comp_contrast(1,4:end);
+% figure();crosscorr(test,mov_y_comp_contrast,600);
 
 %% Calculate fft
 mov_y_frq = [];
@@ -830,9 +830,9 @@ for j = 1:size(mov_x_comp,1)
     set(gca,'Ytick',linspace(-2,1,5)); set(gca, 'YTickLabel',linspace(-64,64,5));
 end
 xlabel('Time (s)');
-subplot(size(mov_x_copy,1),1,3)
+subplot(size(mov_x_comp,1),1,3)
 ylabel('Lateral displacement (\mum)');
-subplot(size(mov_x_copy,1),1,1)
+subplot(size(mov_x_comp,1),1,1)
 title('Lateral displacement mean');
 
 

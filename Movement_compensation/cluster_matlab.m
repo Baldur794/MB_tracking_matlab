@@ -24,10 +24,10 @@ job = createJob(sched);
 % /home/username/Documents/MATLAB/startup.m
 
 %%
-[X,Y] = meshgrid(15:20:175,250:100:1650);
+[X,Y] = meshgrid(15:20:175,150:100:850);
 
 
-wind_size_y = 400;
+wind_size_y = 200;
 wind_size_x = 0;
 rep_x = 5;
 img_wind_cord = zeros(length(X(:)),4);

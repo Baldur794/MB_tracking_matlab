@@ -31,7 +31,7 @@ bck_grnd_img = zeros(img_size);
 %fore_grnd_img = abs(cell2mat(struct2cell(load([filename num2str(idx_seq,'%04d') '/em_' num2str(em_idx,'%04d') '.mat'],'bf_data'))) - bck_grnd_img);
 
 load([filename num2str(idx_seq,'%d') '.mat']);
-fore_grnd_img = (hilbert(img(:,1:img_size(2))));% - bck_grnd_img;
+fore_grnd_img = (hilbert(img(1:2:end,1:img_size(2))));% - bck_grnd_img;
 
 %  load([filepath num2str(idx_seq,'%04d') '/em_0003.mat']); 
 %  fore_grnd_img = bf_data;

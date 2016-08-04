@@ -8,7 +8,7 @@ MB_window_size_search_existing = [3 3]; % [y,x] Search window for ''old'' MB's
 MB_window_size_search_clear = [10 10]; % [y,x] Search window for ''old'' MB's
 
 
-MB_age_condition = 50;
+MB_age_condition = 20;
 MB_count_condition = 40; % Number of areas within search windows
 MB_window_size_density_avg = [5 3]; % Window for density condition
 MB_window_size_density_stuck = [10 10]; % Window for density condition
@@ -29,7 +29,7 @@ MB_window_out_of_bounce = 0; % Checks if search windows is outside image
 fps = 47;
 n_bck_grnd = 10; 
 n_bck_grnd_skip =30;
-v_MB = 0.5*10^(-3);
+v_MB = 1*10^(-3);
 nframe = 100;
 idx_frame_start = 4000;
 img_size = [2489,1183];
@@ -57,7 +57,7 @@ MB.count = 0;
 MB_log = MB;
 
 
-img = load_img_contrast(1000,n_bck_grnd,n_bck_grnd_skip,0.5*10^-3, mov_x_comp_contrast,mov_y_comp_contrast);
+img = load_img_contrast(1000,n_bck_grnd,n_bck_grnd_skip,0.5*10^-3);
 % img = img(15:end,:);%----------
 [X,Y] = meshgrid(1:size(img,2),1:size(img,1));
 [Xq,Yq] = meshgrid(1:1/19.7:size(img,2),1:1/5.1:size(img,1));
@@ -66,29 +66,29 @@ tic
 for idx_frame=idx_frame_start:idx_frame_start+nframe
     idx_frame
     % Load img
-    img = load_img_contrast(idx_frame,n_bck_grnd,n_bck_grnd_skip,v_MB,mov_x_comp_contrast,mov_y_comp_contrast);
+    img = load_img_contrast(idx_frame,n_bck_grnd,n_bck_grnd_skip,v_MB);
 %     img = img(15:end,:);%----------
     img = interp2(X,Y,img,Xq,Yq,interpolation_type);
 %     figure(); imagesc(img); colormap('gray');%---
     
     
-%     %----
+    %----
 %    img = filter(b,1,img,[],1);
 %    img = img(n/2+1:end,:);
-%     %---
+    %---
     
     
 
     % Calculate threshold
-    SEM = std(img(:));               
-    ts = tinv(0.999999999,length(img(:))-1);     
+    SEM = std(img(:));
+    ts = tinv(0.9999,length(img(:))-1);     
     CI = mean(img(:)) + ts*SEM;
     global_threshold = CI;
     
     % Threshold
     img_global_threshold = img;
     img_global_threshold(img_global_threshold < global_threshold) = 0;
-    %figure(); imagesc(img_global_threshold); colormap('gray');%---
+%     figure(); imagesc(img_global_threshold); colormap('gray');%---
     
     % blob labeling from threshold img
     [img_blob_label_global,blob_count_global] = bwlabel(img_global_threshold,4);
@@ -140,7 +140,7 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
         
         % Create temp window
         img_temp_window = img_global_threshold(MB_window_coord_search(1,1):MB_window_coord_search(2,1),MB_window_coord_search(1,2):MB_window_coord_search(2,2));
-        %figure(); imagesc(img_temp_window); colormap('gray');%--- 
+%         figure(); imagesc(img_temp_window); colormap('gray');%--- 
         %figure(); imagesc(img_global_threshold); colormap('gray');%--- 
         
          % Check if any blobs are within window
@@ -363,7 +363,7 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
         
         % Create temp window
         img_temp_window = img(MB_window_coord_search(1,1):MB_window_coord_search(2,1),MB_window_coord_search(1,2):MB_window_coord_search(2,2));
-        %figure(); imagesc(img_temp_window); colormap('gray');%---
+%         figure(); imagesc(img_temp_window); colormap('gray');%---
         
         % Thresholding
         img_temp_window(find(img_temp_window < max_int/MB_window_threshold | img_temp_window > max_int)) = 0;
@@ -473,17 +473,17 @@ toc
 % outputVideo.FrameRate=2;
 % open(outputVideo);
 % mov(1:50)= struct('cdata',[],'colormap',[]);
-%     
+v_MB = 1*10^(-3)  
 for idx_frame = 4000:4112
     
     % Load img
-    img = load_img_contrast(idx_frame,n_bck_grnd,n_bck_grnd_skip,v_MB, mov_x_comp_contrast, mov_y_comp_contrast);
+    img = load_img_contrast(idx_frame,n_bck_grnd,n_bck_grnd_skip,v_MB);
     img = interp2(X,Y,img,Xq,Yq,interpolation_type);
     %img = img(15:end,:);
     
     % Calculate threshold
     SEM = std(img(:));               
-    ts = tinv(0.99999999,length(img(:))-1);     
+    ts = tinv(0.9999,length(img(:))-1);     
     CI = mean(img(:)) + ts*SEM;
     global_threshold = CI;
     
@@ -491,7 +491,7 @@ for idx_frame = 4000:4112
     img_global_threshold(img_global_threshold < global_threshold) = 0;
     
     %img = load_img_contrast(idx_frame,n_bck_grnd,n_bck_grnd_skip,v_MB);
-    pause(0.2)
+    pause(0.5)
 %     figure(4); plot(img_global_threshold);
 %     ylim([threshold, threshold + 40]);
 %    figure(2); imagesc(img); colormap('gray');
@@ -517,7 +517,7 @@ end
    
 %% Find MB from coordinates
 MB_index_valid = [];
-coord = [236 971];
+coord = [573 933];
 for i = 1:size(MB_log,2)
     for j = 1:size(MB_log(i).centroid,1)
         if MB_log(i).centroid(j,1) == coord(2) && MB_log(i).centroid(j,2) == coord(1); 
@@ -552,7 +552,7 @@ for i = 1:size(MB_index_valid,2)
         age_min = MB_log(MB_index_valid(i)).age(1);
     end
 end
-age_min = 3950;
+age_min = 4000;
 test = zeros(1,age_max);
 
 for i = 1:size(MB_index_valid,2)

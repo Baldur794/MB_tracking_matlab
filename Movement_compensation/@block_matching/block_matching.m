@@ -55,26 +55,26 @@ classdef block_matching
 % %set(gca,'Ytick',linspace(0,1960,6)); set(gca, 'YTickLabel',linspace(0,25,6));
 %------------------------
                 end              
-                n = 20;
-                Wn = 0.5;
-                b = fir1(n,Wn);
-                c_filt = filter(b,1,c,[],1);
-                c_filt = c_filt(n/2+1:end,:);
-                c_filt = c_filt(floor(size(c,1)/2)+1:floor(size(c,1)/2)+1+2*obj.max_mov_y,:);                
-                lag_filt = lag(n/2+1:end,:)-n/2;
-                lag_filt = lag_filt(floor(size(c,1)/2)+1:floor(size(c,1)/2)+1+2*obj.max_mov_y,:); 
+%                 n = 20;
+%                 Wn = 0.5;
+%                 b = fir1(n,Wn);
+%                 c_filt = filter(b,1,c,[],1);
+%                 c_filt = c_filt(n/2+1:end,:);
+%                 c_filt = c_filt(floor(size(c,1)/2)+1:floor(size(c,1)/2)+1+2*obj.max_mov_y,:);                
+%                 lag_filt = lag(n/2+1:end,:)-n/2;
+%                 lag_filt = lag_filt(floor(size(c,1)/2)+1:floor(size(c,1)/2)+1+2*obj.max_mov_y,:); 
 %                 figure();plot(lag_filt,c_filt);
 
                 % Finds peak position
-                [max_y max_x] = peak_estimation(c_filt, 'max');
+                [max_y max_x] = peak_estimation(c, 'max');
                 % Finds max correlation
 %                 [max_y max_x] = find(c == max(c(:)));
 %                 motion_y = max_y(1)-obj.max_mov_y-1;
                 motion_x = max_x(1)-obj.max_mov_x-1;
                 %----
-                c_filt_axial = mean(c_filt');
-                [max_y max_x] = peak_estimation(c_filt_axial', 'max');
-                motion_y = max_y(1)-obj.max_mov_y-1;
+                c_axial_mean = mean(c',1);
+                [max_y max_x] = peak_estimation(c_axial_mean', 'max');
+                motion_y = max_y(1)-(size(c,1)-1)/2-obj.max_mov_y-1;
                 %----
                 
             else
