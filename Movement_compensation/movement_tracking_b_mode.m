@@ -3,8 +3,8 @@
 % B_mode
 img_wind_cord = zeros(1,4);
 idx_wind = 1;
-for i = 1:1:5
-    img_wind_cord(idx_wind,:) = [250 450 130+i 130+i];
+for i = 1:1:1
+    img_wind_cord(idx_wind,:) = [250 450 129 131];
     idx_wind = idx_wind + 1;
 end
 
@@ -32,7 +32,7 @@ max_mov_x = 3;
 
 fps = 50;
 frames = 250;
-start_frame = 18;
+start_frame = 1;
 H = block_matching;
 H.max_mov_y = max_mov_y;
 H.max_mov_x = max_mov_x;
@@ -53,8 +53,8 @@ norm = max(abs(img_disp(:)));
 limg=20*log10(abs(img_disp)/norm);
 imagesc(limg,[-40 0]);% xlim([1 size(img,2)]); ylim([1 size(img,1)]);
 colormap('gray'); xlabel('Lateral (mm)'); ylabel('Axial (mm)'); %title('B-mode image');
-%set(gca, 'DataAspectRatio',[1 3.46 1]) % set data aspect ratio in zoom box
-%set(gca, 'PlotBoxAspectRatio',[1 1 1])
+set(gca, 'DataAspectRatio',[1 1.67 1]) % set data aspect ratio in zoom box
+set(gca, 'PlotBoxAspectRatio',[1 1 1])
 %set(gca,'Xtick',linspace(0,280,5)); set(gca, 'XTickLabel',linspace(0,12,5));
 %set(gca,'Ytick',linspace(0,1960,6)); set(gca, 'YTickLabel',linspace(0,25,6));
 
@@ -81,7 +81,7 @@ for idx_wind = 1:size(img_wind_cord,1)
             img_ref_wind = H.img_reference_window(idx_frame, idx_wind, mode);
             
             % Load new img
-            img_new_temp = H.img_new_template(idx_frame+1, idx_wind, mode);
+            img_new_temp = H.img_new_template(idx_frame+1, idx_wind, mode);%--
             
             [motion_y motion_x] = H.motion_displacement(img_ref_wind,img_new_temp);
             mov_y(idx_wind,idx_frame-start_frame+1) = motion_y;
@@ -125,25 +125,52 @@ for idx_wind = 1:size(img_wind_cord,1)
     end
 end 
 
+idx_contrast = sub2ind(size(X_comp),4,6);
+mov_y_comp_contrast = [];
+mov_x_comp_contrast = [];
+mov_y_comp_contrast = mov_y_comp(idx_contrast,:)*25.5/51;
+mov_x_comp_contrast = mov_x_comp(idx_contrast,:)*43/197;
+mov_y_comp_contrast = mov_y_comp_contrast(1,12:end);
+mov_x_comp_contrast = mov_x_comp_contrast(1,12:end);
+
+n = 20;
+Wn = 0.15;
+b = fir1(n,Wn);
+
+% figure();plot(abs(fft(mov_y_comp_contrast-mean(mov_y_comp_contrast))));
+% figure();plot(abs(fft(mov_x_comp_contrast-mean(mov_x_comp_contrast))));
+
+mov_y_comp_contrast = filter(b,1,mov_y_comp_contrast,[],2);
+mov_y_comp_contrast = mov_y_comp_contrast(n/2:end);
+mov_x_comp_contrast = filter(b,1,mov_x_comp_contrast,[],2);
+mov_x_comp_contrast = mov_x_comp_contrast(n/2:end);
+
+figure();plot(mov_y_comp_contrast);
+figure();plot(mov_x_comp_contrast);
+figure();crosscorr(axial_mov,mov_y_comp_contrast,100);
+% figure();crosscorr(lateral_mov,mov_x_comp_contrast,100);
+figure();plot(abs(fft(mov_y_comp_contrast-mean(mov_y_comp_contrast))));
+figure();plot(abs(fft(mov_x_comp_contrast-mean(mov_x_comp_contrast))));
 
 %% Calculate movement (from processed velocity, avg)
-mov_y_comp_avg = zeros(size(vel_y_mean_avg,1),size(vel_y_mean_avg,2)+1);
-mov_x_comp_avg = zeros(size(vel_x_mean_avg,1),size(vel_x_mean_avg,2)+1);
-
-for idx_wind = 1:size(mov_y_comp_avg,1)
-    for idx_frame = start_frame:start_frame+size(mov_y_comp_avg,2)-2;
-        mov_y_comp_avg(idx_wind,idx_frame-start_frame+2) = sum(vel_y_mean_avg(idx_wind,1:idx_frame-start_frame+1));
-        mov_x_comp_avg(idx_wind,idx_frame-start_frame+2) = sum(vel_x_mean_avg(idx_wind,1:idx_frame-start_frame+1));
-    end
-end 
-% idx_contrast = sub2ind(size(X),7,5);
+% mov_y_comp_avg = zeros(size(vel_y_mean_avg,1),size(vel_y_mean_avg,2)+1);
+% mov_x_comp_avg = zeros(size(vel_x_mean_avg,1),size(vel_x_mean_avg,2)+1);
+% 
+% for idx_wind = 1:size(mov_y_comp_avg,1)
+%     for idx_frame = start_frame:start_frame+size(mov_y_comp_avg,2)-2;
+%         mov_y_comp_avg(idx_wind,idx_frame-start_frame+2) = sum(vel_y_mean_avg(idx_wind,1:idx_frame-start_frame+1));
+%         mov_x_comp_avg(idx_wind,idx_frame-start_frame+2) = sum(vel_x_mean_avg(idx_wind,1:idx_frame-start_frame+1));
+%     end
+% end 
+% idx_contrast = sub2ind(size(X_comp),4,6);
 % mov_y_comp_contrast = [];
 % mov_x_comp_contrast = [];
-% mov_y_comp_contrast = mov_y_comp_avg(idx_contrast,:)*51/12.8;
-% mov_x_comp_contrast = mov_x_comp_avg(idx_contrast,:)*197/43;
-% mov_y_comp_contrast = mov_y_comp_contrast(1,4:end);
-% mov_x_comp_contrast = mov_x_comp_contrast(1,4:end);
-% figure();crosscorr(test,mov_y_comp_contrast,600);
+% mov_y_comp_contrast = mov_y_comp_avg(idx_contrast,:)*25.5/51;
+% mov_x_comp_contrast = mov_x_comp_avg(idx_contrast,:)*43/197;
+% mov_y_comp_contrast = mov_y_comp_contrast(1,11:end);
+% mov_x_comp_contrast = mov_x_comp_contrast(1,11:end);
+% figure();crosscorr(axial_mov,mov_y_comp_contrast,100);
+% figure();crosscorr(lateral_mov,mov_x_comp_contrast,100);
 
 %% Calculate fft
 mov_y_frq = [];
@@ -159,7 +186,7 @@ end
 %% Interpolate velocity
 interpolate_factor = 10;
 f_rep = 429;
-rep_factor = 25;
+rep_factor = 10;
 vel_yy = spline(1:size(vel_y,2),vel_y,1:1/interpolate_factor:size(vel_y,2));
 vel_xx = spline(1:size(vel_x,2),vel_x,1:1/interpolate_factor:size(vel_x,2));
 
@@ -205,16 +232,18 @@ end
 axial_vel_std = zeros(size(vel_yy,1),1);
 axial_vel_std = sqrt(axial_vel_var);
 
-% Average of nearby lines
-axial_vel_mean_avg = zeros(size(axial_vel_mean,1)/rep_x,size(axial_vel_list,2));
-for idx_wind = 1:size(axial_vel_mean,1)/rep_x
-    axial_vel_mean_avg(idx_wind,:) = mean(axial_vel_mean(rep_x*(idx_wind-1)+1:rep_x*idx_wind,:));
-end
+% % Average of nearby lines
+% axial_vel_mean_avg = zeros(size(axial_vel_mean,1)/rep_x,size(axial_vel_list,2));
+% for idx_wind = 1:size(axial_vel_mean,1)/rep_x
+%     axial_vel_mean_avg(idx_wind,:) = mean(axial_vel_mean(rep_x*(idx_wind-1)+1:rep_x*idx_wind,:));
+% end
 
-axial_vel_mean_avg = repmat(axial_vel_mean_avg,1,rep_factor);
+axial_vel_mean = repmat(axial_vel_mean,1,rep_factor);
+% axial_vel_mean_avg = repmat(axial_vel_mean_avg,1,rep_factor);
 
-vel_y_mean = spline(linspace(1,f_rep/interpolate_factor,size(axial_vel_mean,2)),axial_vel_mean,1:f_rep/interpolate_factor);
-vel_y_mean_avg = spline(linspace(1,f_rep/interpolate_factor*rep_factor,size(axial_vel_mean_avg,2)),axial_vel_mean_avg,1:f_rep/interpolate_factor*rep_factor);
+% vel_y_mean = spline(linspace(1,f_rep/interpolate_factor,size(axial_vel_mean,2)),axial_vel_mean,1:f_rep/interpolate_factor);
+vel_y_mean = spline(linspace(1,f_rep/interpolate_factor*rep_factor,size(axial_vel_mean,2)),axial_vel_mean,1:f_rep/interpolate_factor*rep_factor);
+% vel_y_mean_avg = spline(linspace(1,f_rep/interpolate_factor*rep_factor,size(axial_vel_mean_avg,2)),axial_vel_mean_avg,1:f_rep/interpolate_factor*rep_factor);
 
 
 % Lateral velocity list
@@ -259,16 +288,18 @@ end
 lateral_vel_std = zeros(size(vel_xx,1),1);
 lateral_vel_std = sqrt(lateral_vel_var);
 
-% Average of nearby lines
-lateral_vel_mean_avg = zeros(size(lateral_vel_mean,1)/rep_x,size(lateral_vel_list,2));
-for idx_wind = 1:size(lateral_vel_mean,1)/rep_x
-    lateral_vel_mean_avg(idx_wind,:) = mean(lateral_vel_mean(rep_x*(idx_wind-1)+1:rep_x*idx_wind,:));
-end
+% % Average of nearby lines
+% lateral_vel_mean_avg = zeros(size(lateral_vel_mean,1)/rep_x,size(lateral_vel_list,2));
+% for idx_wind = 1:size(lateral_vel_mean,1)/rep_x
+%     lateral_vel_mean_avg(idx_wind,:) = mean(lateral_vel_mean(rep_x*(idx_wind-1)+1:rep_x*idx_wind,:));
+% end
 
+lateral_vel_mean = repmat(lateral_vel_mean,1,rep_factor);
 lateral_vel_mean_avg = repmat(lateral_vel_mean_avg,1,rep_factor);
 
-vel_x_mean = spline(linspace(1,f_rep/interpolate_factor,size(lateral_vel_mean,2)),lateral_vel_mean,1:f_rep/interpolate_factor);
-vel_x_mean_avg = spline(linspace(1,f_rep/interpolate_factor*rep_factor,size(lateral_vel_mean_avg,2)),lateral_vel_mean_avg,1:f_rep/interpolate_factor*rep_factor);
+% vel_x_mean = spline(linspace(1,f_rep/interpolate_factor,size(lateral_vel_mean,2)),lateral_vel_mean,1:f_rep/interpolate_factor);
+vel_x_mean = spline(linspace(1,f_rep/interpolate_factor*rep_factor,size(lateral_vel_mean,2)),lateral_vel_mean,1:f_rep/interpolate_factor*rep_factor);
+% vel_x_mean_avg = spline(linspace(1,f_rep/interpolate_factor*rep_factor,size(lateral_vel_mean_avg,2)),lateral_vel_mean_avg,1:f_rep/interpolate_factor*rep_factor);
 
 
 
@@ -400,22 +431,20 @@ figure(13); plot(linspace(0,fps/2,size(lateral_disp_mean_rep,2)/2),abs(lateral_d
 img = abs(load_img_B_mode(1));
 norm=max(img(:));
 
-%---
-img_wind_cord(1,:) = [720 750 120 140];
-H.img_wind_cord(31,:) = [720 750 120 140];
-%---
-
-for n = 3:3
-    idx_wind = 31;
+for n = 5
+    idx_wind = sub2ind(size(X_comp),4,6);
+    
+    H.img_wind_cord(idx_wind,:) = [400 450 110 140];
+    
     h_f=figure;
     outputVideo=VideoWriter(['MB_video_' num2str(n,'%d')]);
     outputVideo.FrameRate=2;
     open(outputVideo);
     
-    nframe = 42;
+    nframe = 100;
     mov(1:nframe)= struct('cdata',[],'colormap',[]);
     pause(0.2)
-    for idx_frame = start_frame+1:start_frame+nframe
+    for idx_frame = start_frame:start_frame+nframe
         switch n
             case 1
                 % Full img compensated
@@ -433,13 +462,14 @@ for n = 3:3
             case 3
                 % Window compensated avg
                 img_new_temp = abs(H.img_new_template(idx_frame, idx_wind, mode));
-                img_new_temp_comp = imtranslate(img_new_temp,[round(mov_x_comp(idx_wind,idx_frame-start_frame+1)),round(mov_y_comp(idx_wind,idx_frame-start_frame+1))]);
+                img_new_temp_comp = imtranslate(img_new_temp,[(mov_x_comp_contrast(idx_frame-start_frame+1)),(mov_y_comp_contrast(idx_frame-start_frame+1))]);
+%                 img_new_temp_comp = imtranslate(img_new_temp,[round(mov_x_comp_contrast(idx_frame-start_frame+1)),round(mov_y_comp_contrast(idx_frame-start_frame+1))]);
                 hAx = imagesc(img_new_temp_comp); colormap(gray);
                 pause(0.3);
             case 4
                 % Window compensated direct
                 img_new_temp = abs(H.img_new_template(idx_frame, idx_wind, mode));
-                img_new_temp_comp = imtranslate(img_new_temp,[round(mov_x(idx_wind,idx_frame-start_frame+1)),round(mov_y(idx_wind,idx_frame-start_frame+1))]);
+                img_new_temp_comp = imtranslate(img_new_temp,[(mov_x(idx_wind,idx_frame-start_frame+1)),(mov_y(idx_wind,idx_frame-start_frame+1))]);
                 hAx = imagesc(img_new_temp_comp); colormap(gray);
                 pause(0.3);
                 
@@ -486,11 +516,11 @@ end
 %% Movement to vector list
 mov_x_grid = [];
 mov_y_grid = [];
-for idx_frame = 1:size(mov_y_comp_avg,2)
-    for idx = 1:size(mov_y_comp_avg,1)
+for idx_frame = 1:size(mov_y_comp,2)
+    for idx = 1:size(mov_y_comp,1)
         [x,y] = ind2sub(size(X),idx);
-        mov_x_grid(idx_frame,x,y) = mov_x_comp_avg(idx,idx_frame);
-        mov_y_grid(idx_frame,x,y) = mov_y_comp_avg(idx,idx_frame);
+        mov_x_grid(idx_frame,x,y) = mov_x_comp(idx,idx_frame);
+        mov_y_grid(idx_frame,x,y) = mov_y_comp(idx,idx_frame);
        
     end
 end
@@ -500,11 +530,11 @@ vel_y_grid = mov_y_grid;
 %% Velocity to vector list
 vel_x_grid = [];
 vel_y_grid = [];
-for idx_frame = 1:size(vel_y_mean_avg,2)
-    for idx = 1:size(vel_y_mean_avg,1)
+for idx_frame = 1:size(vel_y_mean,2)
+    for idx = 1:size(vel_y_mean,1)
         [x,y] = ind2sub(size(X),idx);
-        vel_x_grid(idx_frame,x,y) = vel_x_mean_avg(idx,idx_frame);
-        vel_y_grid(idx_frame,x,y) = vel_y_mean_avg(idx,idx_frame);
+        vel_x_grid(idx_frame,x,y) = vel_x_mean(idx,idx_frame);
+        vel_y_grid(idx_frame,x,y) = vel_y_mean(idx,idx_frame);
        
     end
 end
@@ -524,7 +554,7 @@ for i = 1:size(vel_y_grid,1)
     title(['Frame' num2str(i,'%d')]); 
     hold on
     % Quiver plot
-    q_plot = quiver(X,Y,squeeze(vel_x_grid(i,:,:))*5,squeeze(vel_y_grid(i,:,:))*20);
+    q_plot = quiver(X_comp(:)',Y_comp(:)',squeeze(vel_x_grid(i,:,:))*5,squeeze(vel_y_grid(i,:,:))*20);
 %     q_plot.AutoScaleFactor = 10;
     q_plot.MaxHeadSize = 0.3;
     q_plot.ShowArrowHead = 'on';
@@ -793,24 +823,24 @@ arrow_annotation.Position = [100 100 10 10];
 
 %% Displacement multiple axial overlay mean
   figure();
-for j = 1:size(mov_y_comp,1)
+for j = 1:5%size(mov_y_comp,1)
     
-    subplot(size(mov_y_comp,1),1,j)
+    subplot(5,1,j)
     
     hold on
     
     for i = 1:size(mov_y_comp,3)
-        plot((squeeze(mov_y_comp(j,:,i))));
+        plot((squeeze(mov_y_comp(j+8*3,:,i))));
     end
     hold off
     ylim([-2,8]); %xlim([1 43]);
-    set(gca,'Xtick',linspace(1,40,5)); set(gca,'XtickLabel',linspace(0,0.8,5));
-    set(gca,'Ytick',linspace(-2,8,5)); set(gca, 'YTickLabel',linspace(-64,64,5));
+%     set(gca,'Xtick',linspace(1,40,5)); set(gca,'XtickLabel',linspace(0,0.8,5));
+%     set(gca,'Ytick',linspace(-2,8,5)); set(gca, 'YTickLabel',linspace(-64,64,5));
 end
 xlabel('Time (s)');
-subplot(size(mov_y_comp,1),1,3)
+subplot(5,1,3)
 ylabel('Axial displacement (\mum)');
-subplot(size(mov_y_comp,1),1,1)
+subplot(5,1,1)
 title('Axial displacement mean');
 
 %% Displacement multiple lateral overlay mean
@@ -845,8 +875,8 @@ for j = 1:5
     
     hold on
     
-    for i = 1:size(mov_y_comp,3)
-        plot((squeeze(mov_y_comp(j,:,i))));
+    for i = 1:size(mov_x_comp,3)
+        plot((squeeze(mov_x_comp(j,:,i))));
     end
     hold off
     %ylim([-2,8]); %xlim([1 43]);
@@ -856,11 +886,11 @@ end
 
 %% Displacement multiple axial overlay mean
   figure();
-for j = 1:5
+for j = 1
     
-    subplot(5,1,j)
+%     subplot(5,1,j)
     
-    hold on
+%     hold on
     
     for i = 1:size(mov_y_comp_avg,3)
         plot((squeeze(mov_y_comp_avg(j,:,i))));

@@ -39,42 +39,34 @@ classdef block_matching
                 motion_x = max_x(1)-obj.max_mov_x-1;
             elseif strcmp(obj.cost_function, 'xCorr')
                 % Matlab 2d NCC
-                for i = 1:obj.max_mov_x*2+1
-                    [c(:,i) lag(:,i)] = crosscorr(img_new,img_ref(:,i),obj.max_mov_y*6);
+                for i = 1:size(img_new,2)
+                    c = [];
+                    lag = [];
+                    for j = 1:obj.max_mov_x*2+1
+                        [c(:,j) lag(:,j)] = crosscorr(img_new(:,i),img_ref(:,j+i-1),obj.max_mov_y*2);
+                        %                      figure();crosscorr(img_new,img_ref(:,i),obj.max_mov_y*2);
+                    end
+                    c = c((size(c,1)-1)/2+1:(size(c,1)-1)/2+1+2*obj.max_mov_y,:);
+                    [max_y max_x] = peak_estimation(c, 'max');
+                    motion_x_temp(i) = max_x(1)-obj.max_mov_x-1;
+                end
+                motion_x = mean(motion_x_temp);
+                
+                c = [];
+                lag = [];
+                for i = 1:size(img_new,2)                 
+                    [c(:,i) lag(:,i)] = crosscorr(img_new(:,i),img_ref(:,obj.max_mov_x+i),obj.max_mov_y*2);
 %                     figure();crosscorr(img_new,img_ref(:,i),obj.max_mov_y*2);
-%---------------------
-% figure(1);crosscorr(img_new,img_ref(:,i),obj.max_mov_y*2);
-% title('Cross Correlation (Frame 1-2)');
-% set(gca,'Xtick',linspace(-20,20,9)); set(gca, 'XTickLabel',linspace(-30,10,9));
-% figure(2);
-% hold on
-% plot(img_new,'r');
-% xlim([0 400]);
-% xlabel('Axial (\mum)'); ylabel('Intensity'); title('Frame 1-2');
-% set(gca,'Xtick',linspace(1,400,6)); set(gca, 'XTickLabel',linspace(0,5000,6));
-% %set(gca,'Ytick',linspace(0,1960,6)); set(gca, 'YTickLabel',linspace(0,25,6));
-%------------------------
-                end              
-%                 n = 20;
-%                 Wn = 0.5;
-%                 b = fir1(n,Wn);
-%                 c_filt = filter(b,1,c,[],1);
-%                 c_filt = c_filt(n/2+1:end,:);
-%                 c_filt = c_filt(floor(size(c,1)/2)+1:floor(size(c,1)/2)+1+2*obj.max_mov_y,:);                
-%                 lag_filt = lag(n/2+1:end,:)-n/2;
-%                 lag_filt = lag_filt(floor(size(c,1)/2)+1:floor(size(c,1)/2)+1+2*obj.max_mov_y,:); 
-%                 figure();plot(lag_filt,c_filt);
-
-                % Finds peak position
+                end
+                c = c((size(c,1)-1)/2+1:(size(c,1)-1)/2+1+2*obj.max_mov_y,:);
+                c = mean(c',1)';    
                 [max_y max_x] = peak_estimation(c, 'max');
-                % Finds max correlation
-%                 [max_y max_x] = find(c == max(c(:)));
-%                 motion_y = max_y(1)-obj.max_mov_y-1;
-                motion_x = max_x(1)-obj.max_mov_x-1;
+                motion_y = max_y(1)-obj.max_mov_y-1;
+               
                 %----
-                c_axial_mean = mean(c',1);
-                [max_y max_x] = peak_estimation(c_axial_mean', 'max');
-                motion_y = max_y(1)-(size(c,1)-1)/2-obj.max_mov_y-1;
+%                 c_axial_mean = mean(c',1);
+%                 [max_y max_x] = peak_estimation(c_axial_mean', 'max');
+%                 motion_y = max_y(1)-obj.max_mov_y-1;
                 %----
                 
             else

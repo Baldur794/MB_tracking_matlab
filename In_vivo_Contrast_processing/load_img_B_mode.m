@@ -1,7 +1,7 @@
 function [ fore_grnd_img ] = load_img( idx_seq )
 % Outputs foreground img.
 filename = '/data/cfudata6/s134082/Bachelorprojekt/micro_bubble_data/mat_files/2016_04_21_14_32_21/frame_';
-%filepath = '/data/cfudata6/s134082/Bachelorprojekt/simulation_data/spinning_disk/Spinningdisk_0.002m_s/FIELD/bf_em_data/flow_BF_res1010_full_new/seq_';
+% filepath = '/data/cfudata6/s134082/Bachelorprojekt/simulation_data/spinning_disk/Spinningdisk_0.002m_s/FIELD/bf_em_data/flow_BF_res1010_full_new/seq_';
 
 % chosen emission
 em_idx = 1;
@@ -31,9 +31,9 @@ bck_grnd_img = zeros(img_size);
 %fore_grnd_img = abs(cell2mat(struct2cell(load([filename num2str(idx_seq,'%04d') '/em_' num2str(em_idx,'%04d') '.mat'],'bf_data'))) - bck_grnd_img);
 
 load([filename num2str(idx_seq,'%d') '.mat']);
-fore_grnd_img = (hilbert(img(:,1:img_size(2))));% - bck_grnd_img;
+fore_grnd_img = (hilbert(img(1:2:end,1:img_size(2))));% - bck_grnd_img;
 
-% load([filepath num2str(idx_seq,'%04d') '/em_0003.mat']); 
-% fore_grnd_img = bf_data;
+%  load([filepath num2str(idx_seq,'%04d') '/em_0003.mat']); 
+%  fore_grnd_img = bf_data;
 end
 

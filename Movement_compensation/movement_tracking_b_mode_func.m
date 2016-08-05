@@ -2,11 +2,10 @@ function out = movement_tracking_b_mode_func( img_wind_cord, index )
 %% Displacement RF
 
 max_mov_y = 10;
-max_mov_x = 10;
+max_mov_x = 3;
 
 fps = 50;
 frames = 1000;
-n_frames_rep = 50;
 start_frame = 1;
 H = block_matching;
 H.max_mov_y = max_mov_y;

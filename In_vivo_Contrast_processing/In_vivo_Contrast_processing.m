@@ -8,7 +8,7 @@ MB_window_size_search_existing = [3 3]; % [y,x] Search window for ''old'' MB's
 MB_window_size_search_clear = [10 10]; % [y,x] Search window for ''old'' MB's
 
 
-MB_age_condition = 20;
+MB_age_condition = 30;
 MB_count_condition = 40; % Number of areas within search windows
 MB_window_size_density_avg = [5 3]; % Window for density condition
 MB_window_size_density_stuck = [10 10]; % Window for density condition
@@ -29,9 +29,10 @@ MB_window_out_of_bounce = 0; % Checks if search windows is outside image
 fps = 47;
 n_bck_grnd = 10; 
 n_bck_grnd_skip =30;
-v_MB = 1*10^(-3);
-nframe = 100;
+v_MB = 0.5*10^(-3);
+nframe = 250;
 idx_frame_start = 4000;
+idx_comp_sync = 3950;
 img_size = [2489,1183];
 interpolation_type = 'spline';
 
@@ -57,7 +58,7 @@ MB.count = 0;
 MB_log = MB;
 
 
-img = load_img_contrast(1000,n_bck_grnd,n_bck_grnd_skip,0.5*10^-3);
+img = load_img_contrast(4000, idx_comp_sync, n_bck_grnd, n_bck_grnd_skip, v_MB,mov_x_comp_contrast,mov_y_comp_contrast);
 % img = img(15:end,:);%----------
 [X,Y] = meshgrid(1:size(img,2),1:size(img,1));
 [Xq,Yq] = meshgrid(1:1/19.7:size(img,2),1:1/5.1:size(img,1));
@@ -66,7 +67,7 @@ tic
 for idx_frame=idx_frame_start:idx_frame_start+nframe
     idx_frame
     % Load img
-    img = load_img_contrast(idx_frame,n_bck_grnd,n_bck_grnd_skip,v_MB);
+    img = load_img_contrast(idx_frame,idx_comp_sync,n_bck_grnd,n_bck_grnd_skip,v_MB,mov_x_comp_contrast,mov_y_comp_contrast);
 %     img = img(15:end,:);%----------
     img = interp2(X,Y,img,Xq,Yq,interpolation_type);
 %     figure(); imagesc(img); colormap('gray');%---
@@ -95,7 +96,8 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
     
     % Sort MB's after intensity
     MB_sort_index = logical([MB.state]);
-    [~,MB_sort_index] = sort([MB.max_int].*MB_sort_index,'descend'); 
+    [~,MB_sort_index] = sort([MB.max_int].*MB_sort_index,'descend');
+  
     % Connect MB's
     for i = 1:sum([MB.state])
         % Update MB_index
@@ -441,7 +443,7 @@ toc
 %%
 % 
 %%
-% img = load_img_contrast(2000,n_bck_grnd,n_bck_grnd_skip,0.5*10^-3);
+% img = load_img_contrast(2000,idx_comp_sync,n_bck_grnd,n_bck_grnd_skip,0.5*10^-3,mov_x_comp_contrast,mov_y_comp_contrast);
 % [X,Y] = meshgrid(1:size(img,2),1:size(img,1));
 % [Xq,Yq] = meshgrid(1:1/19.7:size(img,2),1:1/5.1:size(img,1));
 % img = interp2(X,Y,img,Xq,Yq,interpolation_type);
@@ -452,7 +454,7 @@ toc
 % idx_frame_start = 2000;
 % for i = idx_frame_start:idx_frame_start+nframe
 %     pause(0.3)
-%     img = load_img_contrast(i,n_bck_grnd,n_bck_grnd_skip,v_MB);
+%     img = load_img_contrast(i,idx_comp_sync,n_bck_grnd,n_bck_grnd_skip,v_MB,mov_x_comp_contrast,mov_y_comp_contrast);
 %     img = interp2(X,Y,img,Xq,Yq,interpolation_type);
 %     
 % %     % Calculate threshold
@@ -473,11 +475,11 @@ toc
 % outputVideo.FrameRate=2;
 % open(outputVideo);
 % mov(1:50)= struct('cdata',[],'colormap',[]);
-v_MB = 1*10^(-3)  
+v_MB = 0.5*10^(-3)  
 for idx_frame = 4000:4112
     
     % Load img
-    img = load_img_contrast(idx_frame,n_bck_grnd,n_bck_grnd_skip,v_MB);
+    img = load_img_contrast(idx_frame,idx_comp_sync,n_bck_grnd,n_bck_grnd_skip,v_MB,mov_x_comp_contrast,mov_y_comp_contrast);
     img = interp2(X,Y,img,Xq,Yq,interpolation_type);
     %img = img(15:end,:);
     
@@ -490,12 +492,8 @@ for idx_frame = 4000:4112
     img_global_threshold = img;
     img_global_threshold(img_global_threshold < global_threshold) = 0;
     
-    %img = load_img_contrast(idx_frame,n_bck_grnd,n_bck_grnd_skip,v_MB);
     pause(0.5)
-%     figure(4); plot(img_global_threshold);
-%     ylim([threshold, threshold + 40]);
-%    figure(2); imagesc(img); colormap('gray');
-    figure(101); imagesc(img_global_threshold); colormap('gray');    
+    figure(103); imagesc(img_global_threshold); colormap('gray');    
 %     xlabel('Lateral [mm]'); ylabel('Axial [mm]'); 
     title(['frame' num2str(idx_frame,'%d')]);
 %     set(gca,'Xtick',linspace(0,1189,5)); set(gca, 'XTickLabel',linspace(0,12,5));
@@ -517,7 +515,7 @@ end
    
 %% Find MB from coordinates
 MB_index_valid = [];
-coord = [573 933];
+coord = [335 971];
 for i = 1:size(MB_log,2)
     for j = 1:size(MB_log(i).centroid,1)
         if MB_log(i).centroid(j,1) == coord(2) && MB_log(i).centroid(j,2) == coord(1); 
@@ -533,16 +531,16 @@ for i = 1:size(MB_index_valid,2)
     temp_y = MB_log(MB_index_valid(i)).centroid(:,1);
     temp_x = MB_log(MB_index_valid(i)).centroid(:,2);
     figure(); plot(temp_y)
-    %figure(); plot(temp_x)te
+    %figure(); plot(temp_x)
     %temp_y_fft = fft(temp_y-mean(temp_y));
     %figure(); plot(linspace(0,fps/2,round(size(temp_y_fft,1)/2)),abs(temp_y_fft(1:round(size(temp_y_fft,1)/2)))); legend('1','2','3','4','5','6','7');  xlabel('Frequency (Hz)'); ylabel('Magnitude'); % title('Frequency spectrum of axial displacement');
     % %temp_x_fft = fft(temp_x-mean(temp_x));
     %figure(); plot(linspace(0,fps/2,round(size(temp_x_fft,1)/2)),abs(temp_x_fft(1:round(size(temp_x_fft,1)/2)))); legend('1','2','3','4','5','6','7');  xlabel('Frequency (Hz)'); ylabel('Magnitude'); % title('Frequency spectrum of axial displacement');
 end
-%%
+%% Axial
 MB_index_valid = MB_index_filter_age;
 age_max = 0;
-age_min = MB_log(MB_index_valid(1)).age(1)
+age_min = MB_log(MB_index_valid(1)).age(1);
 for i = 1:size(MB_index_valid,2)
     MB_log(MB_index_valid(i)).age
     if MB_log(MB_index_valid(i)).age(2) > age_max
@@ -552,17 +550,40 @@ for i = 1:size(MB_index_valid,2)
         age_min = MB_log(MB_index_valid(i)).age(1);
     end
 end
-age_min = 4000;
-test = zeros(1,age_max);
+age_min = 3950;
 
+% Axial
+axial_mov = zeros(1,age_max);
+axial_mov_count = zeros(1,age_max);
 for i = 1:size(MB_index_valid,2)
     temp = abs(MB_log(MB_index_valid(i)).centroid(:,1)-mean(MB_log(MB_index_valid(i)).centroid(:,1)));
-    test(1,MB_log(MB_index_valid(i)).age(1):MB_log(MB_index_valid(i)).age(2))...
+    axial_mov(1,MB_log(MB_index_valid(i)).age(1):MB_log(MB_index_valid(i)).age(2))...
         = (MB_log(MB_index_valid(i)).centroid(:,1)-mean(MB_log(MB_index_valid(i)).centroid(:,1)))/max(temp);
+    axial_mov_count(1,MB_log(MB_index_valid(i)).age(1):MB_log(MB_index_valid(i)).age(2))...
+        = axial_mov_count(1,MB_log(MB_index_valid(i)).age(1):MB_log(MB_index_valid(i)).age(2)) + 1;
+%     axial_mov(find(axial_mov ~= 0)) = axial_mov(find(axial_mov ~= 0))./axial_mov_count(find(axial_mov ~= 0));
 end
-test = test(1,age_min:end);
-figure(); plot(test);
-test_fft = fft(test-mean(test));
+% find(axial_mov ~= 0)
+axial_mov = axial_mov(1,age_min:end);
+figure(); plot(axial_mov);
+test_fft = fft(axial_mov-mean(axial_mov));
+figure(); plot(abs(test_fft));
+
+% Lateral
+lateral_mov = zeros(1,age_max);
+lateral_mov_count = zeros(1,age_max);
+for i = 1:size(MB_index_valid,2)
+    temp = abs(MB_log(MB_index_valid(i)).centroid(:,2)-mean(MB_log(MB_index_valid(i)).centroid(:,2)));
+    lateral_mov(1,MB_log(MB_index_valid(i)).age(1):MB_log(MB_index_valid(i)).age(2))...
+        = (MB_log(MB_index_valid(i)).centroid(:,2)-mean(MB_log(MB_index_valid(i)).centroid(:,2)))/max(temp);
+    lateral_mov_count(1,MB_log(MB_index_valid(i)).age(1):MB_log(MB_index_valid(i)).age(2))...
+        = lateral_mov_count(1,MB_log(MB_index_valid(i)).age(1):MB_log(MB_index_valid(i)).age(2)) + 1;
+%     lateral_mov(find(lateral_mov ~= 0)) = lateral_mov(find(lateral_mov ~= 0))./lateral_mov_count(find(lateral_mov ~= 0));
+end
+% find(lateral_mov ~= 0)
+lateral_mov = lateral_mov(1,age_min:end);
+figure(); plot(lateral_mov);
+test_fft = fft(lateral_mov-mean(lateral_mov));
 figure(); plot(abs(test_fft));
 
 %%
@@ -574,7 +595,7 @@ pause(0.3)
 for idx_frame = 4000:4046
     
      % Load img
-    img = load_img_contrast(idx_frame,n_bck_grnd,n_bck_grnd_skip,v_MB);
+    img = load_img_contrast(idx_frame,idx_comp_sync,n_bck_grnd,n_bck_grnd_skip,v_MB,mov_x_comp_contrast,mov_y_comp_contrast);
 %    img = abs(interp2(X,Y,img,Xq,Yq,interpolation_type));
     %img = img(15:end,:);
     
@@ -587,7 +608,7 @@ for idx_frame = 4000:4046
 %     img_global_threshold = img;
 %     img_global_threshold(img_global_threshold < global_threshold) = 0;
     
-    %img = load_img_contrast(idx_frame,n_bck_grnd,n_bck_grnd_skip,v_MB);
+    %img = load_img_contrast(idx_frame,idx_comp_sync,n_bck_grnd,n_bck_grnd_skip,v_MB,mov_x_comp_contrast,mov_y_comp_contrast);
     pause(0.3)
 %     figure(4); plot(img);
 %     ylim([0 100]);

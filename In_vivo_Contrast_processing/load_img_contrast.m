@@ -1,4 +1,4 @@
-function [ fore_grnd_img ] = load_img_contrast( idx_seq, n_bck_grnd, n_bck_grnd_skip, v_MB)
+function [ fore_grnd_img ] = load_img_contrast( idx_frame, idx_sync, n_bck_grnd, n_bck_grnd_skip, v_MB, mov_x_comp_contrast, mov_y_comp_contrast)
 % Outputs foreground img.
 filename = '/data/cfudata6/s134082/Bachelorprojekt/micro_bubble_data/mat_files/2016_04_21_15_29_41/frame_';
 
@@ -11,7 +11,7 @@ bck_grnd_img = zeros(img_size);
 
 if n_bck_grnd > 0
     % sum of n_bck_grnd images
-    for i = idx_seq-n_bck_grnd_skip*n_bck_grnd-n_bck_grnd_skip:n_bck_grnd_skip:idx_seq-2*n_bck_grnd_skip
+    for i = idx_frame-n_bck_grnd_skip*n_bck_grnd-n_bck_grnd_skip:n_bck_grnd_skip:idx_frame-2*n_bck_grnd_skip
         load([filename num2str(i,'%d') '.mat'],'img');
         bck_grnd_img = bck_grnd_img + img(1:img_size(1),1:img_size(2));
     end
@@ -44,12 +44,15 @@ h_bandpass_flip = fliplr(h_bandpass);
 
 filt_img = zeros(img_size);
 idx_filt = 1;
-for i = idx_seq-n_filter/2:idx_seq+n_filter/2
-    load([filename num2str(i,'%d') '.mat'],'img');
+for idx_load = idx_frame-n_filter/2:idx_frame+n_filter/2
+    idx_comp = idx_load-idx_sync+n_filter/2+1;
+    load([filename num2str(idx_load,'%d') '.mat'],'img');
+    img = img(1:img_size(1),1:img_size(2))-bck_grnd_img;
+    img = imtranslate(img,[0,mov_y_comp_contrast(idx_comp)],'cubic');%mov_x_comp_contrast(idx_comp) 
     filt_img = filt_img + img(1:img_size(1),1:img_size(2))*h_bandpass_flip(idx_filt);
     idx_filt = idx_filt + 1;
 end
-fore_grnd_img = abs(filt_img-bck_grnd_img);
-%fore_grnd_img = abs(filt_img);
+% fore_grnd_img = abs(filt_img-bck_grnd_img);
+fore_grnd_img = abs(filt_img);
 end
 

@@ -24,17 +24,14 @@ job = createJob(sched);
 % /home/username/Documents/MATLAB/startup.m
 
 %%
-[X,Y] = meshgrid(15:20:175,150:100:850);
+[X_comp,Y_comp] = meshgrid(15:20:175,150:100:850);
 
 
 wind_size_y = 200;
-wind_size_x = 0;
-rep_x = 5;
-img_wind_cord = zeros(length(X(:)),4);
-for i = 1:length(X(:))
-    for j = 1:rep_x
-        img_wind_cord((i-1)*rep_x+j,:) =[Y(i)-wind_size_y/2,Y(i)+wind_size_y/2,X(i)-wind_size_x/2-(floor(rep_x/2)+1)+j,X(i)+wind_size_x/2-(floor(rep_x/2)+1)+j];
-    end
+wind_size_x = 3;
+img_wind_cord = zeros(length(X_comp(:)),4);
+for i = 1:length(X_comp(:))
+    img_wind_cord(i,:) = [Y_comp(i)-wind_size_y/2,Y_comp(i)+wind_size_y/2,X_comp(i)-floor(wind_size_x/2),X_comp(i)+floor(wind_size_x/2)];
 end
 tasks = size(img_wind_cord,1);
 for i=1:tasks
@@ -53,6 +50,7 @@ wait(job);
 % Now that the job has finished we can harvest the results from all the
 % workers, note that the results of the tasks are stored as a class object!
 % data = fetchOutputs(job);
+data = [];
 for i=1:tasks
     data{i}=job.Tasks(i,1).OutputArguments;
 end
@@ -70,12 +68,12 @@ destroy(job);
 for i = 1:size(data,2)
     if isempty(data{1,i})
         disp(['Missing index ' num2str(i,'%d')])
-        data{1,i} = data{1,i-1};
-        data{1,i}{1,1}{3} = data{1,i}{1,1}{3}+1;
+%         data{1,i} = data{1,i-1};
+%         data{1,i}{1,1}{3} = data{1,i}{1,1}{3}+1;
     end
-    if data{1,i}{1,1}{3} ~= i
-        disp(['Index ' num2str(i,'%d') ' not correct'])
-    end
+%     if data{1,i}{1,1}{3} ~= i
+%         disp(['Index ' num2str(i,'%d') ' not correct'])
+%     end
 end
 
 vel_y = [];
@@ -114,7 +112,7 @@ colormap('gray'); xlabel('Lateral (mm)'); ylabel('Axial (mm)'); %title('B-mode i
 set(gca,'Ytick',linspace(1,1960,6)); set(gca,'YtickLabel',linspace(0,25,6));
 set(gca,'Xtick',linspace(1,280,6)); set(gca, 'XTickLabel',linspace(0,12,6));
 hold on
-scatter_img = scatter(X(:),Y(:))
+scatter_img = scatter(X_comp(:),Y_comp(:))
 set(scatter_img,'SizeData', 50); % size of dots
 set(scatter_img,'MarkerFacecolor','flat'); % appearance of dots
 % for i = 1:15
