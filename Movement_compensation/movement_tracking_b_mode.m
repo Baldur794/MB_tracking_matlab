@@ -123,18 +123,19 @@ for idx_wind = 1:size(img_wind_cord,1)
         mov_y_comp(idx_wind,idx_frame-start_frame+2) = sum(vel_y_mean(idx_wind,1:idx_frame-start_frame+1));
         mov_x_comp(idx_wind,idx_frame-start_frame+2) = sum(vel_x_mean(idx_wind,1:idx_frame-start_frame+1));
     end
-end 
-
+end
+corr_max = 0;
+% for i = 180:210
 idx_contrast = sub2ind(size(X_comp),4,6);
 mov_y_comp_contrast = [];
 mov_x_comp_contrast = [];
-mov_y_comp_contrast = mov_y_comp(idx_contrast,:)*25.5/51;
-mov_x_comp_contrast = mov_x_comp(idx_contrast,:)*43/197;
-mov_y_comp_contrast = mov_y_comp_contrast(1,12:end);
-mov_x_comp_contrast = mov_x_comp_contrast(1,12:end);
-
+mov_y_comp_contrast = -mov_y_comp(idx_contrast,:)*3.5;%2.55
+mov_x_comp_contrast = -mov_x_comp(idx_contrast,:)*4.3;
+mov_y_comp_contrast = mov_y_comp_contrast(1,45:end);
+mov_x_comp_contrast = mov_x_comp_contrast(1,45:end);
+% figure();plot(mov_y_comp_contrast);
 n = 20;
-Wn = 0.15;
+Wn = 0.22;
 b = fir1(n,Wn);
 
 % figure();plot(abs(fft(mov_y_comp_contrast-mean(mov_y_comp_contrast))));
@@ -142,36 +143,23 @@ b = fir1(n,Wn);
 
 mov_y_comp_contrast = filter(b,1,mov_y_comp_contrast,[],2);
 mov_y_comp_contrast = mov_y_comp_contrast(n/2:end);
+mov_y_comp_contrast = round(mov_y_comp_contrast);
 mov_x_comp_contrast = filter(b,1,mov_x_comp_contrast,[],2);
 mov_x_comp_contrast = mov_x_comp_contrast(n/2:end);
-
-figure();plot(mov_y_comp_contrast);
-figure();plot(mov_x_comp_contrast);
+mov_x_comp_contrast = round(mov_x_comp_contrast);
+[P,Q]= rat(47/50);
+mov_y_comp_contrast = resample(mov_y_comp_contrast,P,Q);
+% figure();plot(mov_y_comp_contrast);
+% figure();plot(mov_x_comp_contrast);
 figure();crosscorr(axial_mov,mov_y_comp_contrast,100);
+% if max(crosscorr(axial_mov,mov_y_comp_contrast,100)) > corr_max
+%     corr_max = max(crosscorr(axial_mov,mov_y_comp_contrast,100));
+%     i
+% end
 % figure();crosscorr(lateral_mov,mov_x_comp_contrast,100);
-figure();plot(abs(fft(mov_y_comp_contrast-mean(mov_y_comp_contrast))));
-figure();plot(abs(fft(mov_x_comp_contrast-mean(mov_x_comp_contrast))));
-
-%% Calculate movement (from processed velocity, avg)
-% mov_y_comp_avg = zeros(size(vel_y_mean_avg,1),size(vel_y_mean_avg,2)+1);
-% mov_x_comp_avg = zeros(size(vel_x_mean_avg,1),size(vel_x_mean_avg,2)+1);
-% 
-% for idx_wind = 1:size(mov_y_comp_avg,1)
-%     for idx_frame = start_frame:start_frame+size(mov_y_comp_avg,2)-2;
-%         mov_y_comp_avg(idx_wind,idx_frame-start_frame+2) = sum(vel_y_mean_avg(idx_wind,1:idx_frame-start_frame+1));
-%         mov_x_comp_avg(idx_wind,idx_frame-start_frame+2) = sum(vel_x_mean_avg(idx_wind,1:idx_frame-start_frame+1));
-%     end
-% end 
-% idx_contrast = sub2ind(size(X_comp),4,6);
-% mov_y_comp_contrast = [];
-% mov_x_comp_contrast = [];
-% mov_y_comp_contrast = mov_y_comp_avg(idx_contrast,:)*25.5/51;
-% mov_x_comp_contrast = mov_x_comp_avg(idx_contrast,:)*43/197;
-% mov_y_comp_contrast = mov_y_comp_contrast(1,11:end);
-% mov_x_comp_contrast = mov_x_comp_contrast(1,11:end);
-% figure();crosscorr(axial_mov,mov_y_comp_contrast,100);
-% figure();crosscorr(lateral_mov,mov_x_comp_contrast,100);
-
+% figure();plot(abs(fft(mov_y_comp_contrast-mean(mov_y_comp_contrast))));
+% figure();plot(abs(fft(mov_x_comp_contrast-mean(mov_x_comp_contrast))));
+% end
 %% Calculate fft
 mov_y_frq = [];
 for idx_wind = 1:size(img_wind_cord,1)
@@ -186,7 +174,7 @@ end
 %% Interpolate velocity
 interpolate_factor = 10;
 f_rep = 429;
-rep_factor = 10;
+rep_factor = 15;
 vel_yy = spline(1:size(vel_y,2),vel_y,1:1/interpolate_factor:size(vel_y,2));
 vel_xx = spline(1:size(vel_x,2),vel_x,1:1/interpolate_factor:size(vel_x,2));
 
@@ -232,18 +220,10 @@ end
 axial_vel_std = zeros(size(vel_yy,1),1);
 axial_vel_std = sqrt(axial_vel_var);
 
-% % Average of nearby lines
-% axial_vel_mean_avg = zeros(size(axial_vel_mean,1)/rep_x,size(axial_vel_list,2));
-% for idx_wind = 1:size(axial_vel_mean,1)/rep_x
-%     axial_vel_mean_avg(idx_wind,:) = mean(axial_vel_mean(rep_x*(idx_wind-1)+1:rep_x*idx_wind,:));
-% end
-
 axial_vel_mean = repmat(axial_vel_mean,1,rep_factor);
-% axial_vel_mean_avg = repmat(axial_vel_mean_avg,1,rep_factor);
 
 % vel_y_mean = spline(linspace(1,f_rep/interpolate_factor,size(axial_vel_mean,2)),axial_vel_mean,1:f_rep/interpolate_factor);
 vel_y_mean = spline(linspace(1,f_rep/interpolate_factor*rep_factor,size(axial_vel_mean,2)),axial_vel_mean,1:f_rep/interpolate_factor*rep_factor);
-% vel_y_mean_avg = spline(linspace(1,f_rep/interpolate_factor*rep_factor,size(axial_vel_mean_avg,2)),axial_vel_mean_avg,1:f_rep/interpolate_factor*rep_factor);
 
 
 % Lateral velocity list
@@ -288,18 +268,10 @@ end
 lateral_vel_std = zeros(size(vel_xx,1),1);
 lateral_vel_std = sqrt(lateral_vel_var);
 
-% % Average of nearby lines
-% lateral_vel_mean_avg = zeros(size(lateral_vel_mean,1)/rep_x,size(lateral_vel_list,2));
-% for idx_wind = 1:size(lateral_vel_mean,1)/rep_x
-%     lateral_vel_mean_avg(idx_wind,:) = mean(lateral_vel_mean(rep_x*(idx_wind-1)+1:rep_x*idx_wind,:));
-% end
-
 lateral_vel_mean = repmat(lateral_vel_mean,1,rep_factor);
-lateral_vel_mean_avg = repmat(lateral_vel_mean_avg,1,rep_factor);
 
 % vel_x_mean = spline(linspace(1,f_rep/interpolate_factor,size(lateral_vel_mean,2)),lateral_vel_mean,1:f_rep/interpolate_factor);
 vel_x_mean = spline(linspace(1,f_rep/interpolate_factor*rep_factor,size(lateral_vel_mean,2)),lateral_vel_mean,1:f_rep/interpolate_factor*rep_factor);
-% vel_x_mean_avg = spline(linspace(1,f_rep/interpolate_factor*rep_factor,size(lateral_vel_mean_avg,2)),lateral_vel_mean_avg,1:f_rep/interpolate_factor*rep_factor);
 
 
 
