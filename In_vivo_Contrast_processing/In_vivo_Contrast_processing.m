@@ -8,7 +8,7 @@ MB_window_size_search_existing = [3 3]; % [y,x] Search window for ''old'' MB's
 MB_window_size_search_clear = [10 10]; % [y,x] Search window for ''old'' MB's
 
 
-MB_age_condition = 30;
+MB_age_condition = 20;
 MB_count_condition = 40; % Number of areas within search windows
 MB_window_size_density_avg = [5 3]; % Window for density condition
 MB_window_size_density_stuck = [10 10]; % Window for density condition
@@ -30,11 +30,12 @@ fps = 47;
 n_bck_grnd = 10; 
 n_bck_grnd_skip = 30;
 v_MB = 0.5*10^(-3);
-nframe = 130;
-idx_frame_start = 3970;
+nframe = 100;%130;
+idx_frame_start = 4040;%3970;
 idx_comp_sync = 3920;
 % img_size = [2489,1183];
-img_size = [205,316];
+% img_size = [205,316];
+img_size = [154 158];
 interpolation_type = 'spline';
 
 %%
@@ -462,7 +463,7 @@ toc
 % open(outputVideo);
 % mov(1:50)= struct('cdata',[],'colormap',[]);
 v_MB = 0.5*10^(-3)  
-for idx_frame = 3970:4112
+for idx_frame = 4040:4112
     
     % Load img
     img = load_img_contrast(idx_frame,idx_comp_sync,n_bck_grnd,n_bck_grnd_skip,v_MB,mov_x_comp_contrast,mov_y_comp_contrast);
@@ -501,14 +502,14 @@ end
    
 %% Find MB from coordinates
 MB_index_valid = [];
-coord = [148 97];
+coord = [99 40];
 for i = 1:size(MB_log,2)
     for j = 1:size(MB_log(i).centroid,1)
         if MB_log(i).centroid(j,1) == coord(2) && MB_log(i).centroid(j,2) == coord(1); 
             MB_index_valid = [MB_index_valid i]
             MB_log(i).age
             i
-            break;
+            break
         end
     end
 end
@@ -525,7 +526,7 @@ for i = 1:size(MB_index_valid,2)
     %figure(); plot(linspace(0,fps/2,round(size(temp_x_fft,1)/2)),abs(temp_x_fft(1:round(size(temp_x_fft,1)/2)))); legend('1','2','3','4','5','6','7');  xlabel('Frequency (Hz)'); ylabel('Magnitude'); % title('Frequency spectrum of axial displacement');
 end
 %% Axial
-MB_index_valid = [4 131]%MB_index_filter_age;
+MB_index_valid = [11];%MB_index_filter_age;
 age_max = 0;
 age_min = MB_log(MB_index_valid(1)).age(1);
 for i = 1:size(MB_index_valid,2)
@@ -542,36 +543,46 @@ age_min = idx_comp_sync;
 % Axial
 axial_mov = zeros(1,age_max);
 axial_mov_count = zeros(1,age_max);
+temp_sum = 0;
+temp_age = 0;
 for i = 1:size(MB_index_valid,2)
-    temp = abs(MB_log(MB_index_valid(i)).centroid(:,1)-mean(MB_log(MB_index_valid(i)).centroid(:,1)));
     axial_mov(1,MB_log(MB_index_valid(i)).age(1):MB_log(MB_index_valid(i)).age(2))...
-        = (MB_log(MB_index_valid(i)).centroid(:,1)-mean(MB_log(MB_index_valid(i)).centroid(:,1)));%/max(temp);
-    axial_mov_count(1,MB_log(MB_index_valid(i)).age(1):MB_log(MB_index_valid(i)).age(2))...
-        = axial_mov_count(1,MB_log(MB_index_valid(i)).age(1):MB_log(MB_index_valid(i)).age(2)) + 1;
-%     axial_mov(find(axial_mov ~= 0)) = axial_mov(find(axial_mov ~= 0))./axial_mov_count(find(axial_mov ~= 0));
+        = (MB_log(MB_index_valid(i)).centroid(:,1));
+    temp_sum = temp_sum + sum(MB_log(MB_index_valid(i)).centroid(:,1));
+    temp_age = temp_age + MB_log(MB_index_valid(i)).age(3);
 end
-% find(axial_mov ~= 0)
+temp_mean = temp_sum/temp_age;
+for i = 1:size(MB_index_valid,2)
+    axial_mov(1,MB_log(MB_index_valid(i)).age(1):MB_log(MB_index_valid(i)).age(2))...
+        = axial_mov(1,MB_log(MB_index_valid(i)).age(1):MB_log(MB_index_valid(i)).age(2))-temp_mean;
+end 
 axial_mov = axial_mov(1,age_min:end);%age_min
 figure(); plot(axial_mov);
-test_fft = fft(axial_mov-mean(axial_mov));
-figure(); plot(abs(test_fft));
+axial_mov_fft = fft(axial_mov);
+figure(); plot(abs(axial_mov_fft));
 
 % Lateral
 lateral_mov = zeros(1,age_max);
 lateral_mov_count = zeros(1,age_max);
+temp_sum = 0;
+temp_age = 0;
 for i = 1:size(MB_index_valid,2)
-    temp = abs(MB_log(MB_index_valid(i)).centroid(:,2)-mean(MB_log(MB_index_valid(i)).centroid(:,2)));
     lateral_mov(1,MB_log(MB_index_valid(i)).age(1):MB_log(MB_index_valid(i)).age(2))...
-        = (MB_log(MB_index_valid(i)).centroid(:,2)-mean(MB_log(MB_index_valid(i)).centroid(:,2)))/max(temp);
-    lateral_mov_count(1,MB_log(MB_index_valid(i)).age(1):MB_log(MB_index_valid(i)).age(2))...
-        = lateral_mov_count(1,MB_log(MB_index_valid(i)).age(1):MB_log(MB_index_valid(i)).age(2)) + 1;
-%     lateral_mov(find(lateral_mov ~= 0)) = lateral_mov(find(lateral_mov ~= 0))./lateral_mov_count(find(lateral_mov ~= 0));
+        = (MB_log(MB_index_valid(i)).centroid(:,2));
+    temp_sum = temp_sum + sum(MB_log(MB_index_valid(i)).centroid(:,2));
+    temp_age = temp_age + MB_log(MB_index_valid(i)).age(3);
 end
+temp_mean = temp_sum/temp_age;
+for i = 1:size(MB_index_valid,2)
+    lateral_mov(1,MB_log(MB_index_valid(i)).age(1):MB_log(MB_index_valid(i)).age(2))...
+        = lateral_mov(1,MB_log(MB_index_valid(i)).age(1):MB_log(MB_index_valid(i)).age(2))-temp_mean;
+end 
+lateral_mov = lateral_mov(1,age_min:end);    
+
 % find(lateral_mov ~= 0)
-lateral_mov = lateral_mov(1,age_min:end);
 figure(); plot(lateral_mov);
-test_fft = fft(lateral_mov-mean(lateral_mov));
-figure(); plot(abs(test_fft));
+lateral_mov_fft = fft(lateral_mov);
+figure(); plot(abs(lateral_mov_fft));
 
 %%
 outputVideo=VideoWriter('contrast_video_clean_log_35');

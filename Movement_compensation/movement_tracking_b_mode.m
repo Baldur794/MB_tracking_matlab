@@ -124,42 +124,96 @@ for idx_wind = 1:size(img_wind_cord,1)
         mov_x_comp(idx_wind,idx_frame-start_frame+2) = sum(vel_x_mean(idx_wind,1:idx_frame-start_frame+1));
     end
 end
-corr_max = 0;
-% for i = 180:210
+
 idx_contrast = sub2ind(size(X_comp),4,6);
-mov_y_comp_contrast = [];
-mov_x_comp_contrast = [];
-mov_y_comp_contrast = -mov_y_comp(idx_contrast,:)*3.5;%2.55
-mov_x_comp_contrast = -mov_x_comp(idx_contrast,:)*4.3;
-mov_y_comp_contrast = mov_y_comp_contrast(1,45:end);
-mov_x_comp_contrast = mov_x_comp_contrast(1,45:end);
-% figure();plot(mov_y_comp_contrast);
+
+mov_y_comp_contrast_ventilator = [];
+mov_x_comp_contrast_ventilator = [];
+mov_y_comp_contrast_pulse = [];
+mov_x_comp_contrast_pulse = [];
+
+mov_y_comp_contrast_ventilator = -mov_y_comp(idx_contrast,:)*2.55;
+mov_x_comp_contrast_ventilator = -mov_x_comp(idx_contrast,:)*4.3;
+mov_y_comp_contrast_pulse = -mov_y_comp(idx_contrast,:)*2.55;
+mov_x_comp_contrast_pulse = -mov_x_comp(idx_contrast,:)*4.3;
+
+mov_y_comp_contrast_ventilator = mov_y_comp_contrast_ventilator(1,35:end);%45
+mov_x_comp_contrast_ventilator = mov_x_comp_contrast_ventilator(1,35:end);%45
+mov_y_comp_contrast_pulse = mov_y_comp_contrast_pulse(1,8:end);
+mov_x_comp_contrast_pulse = mov_x_comp_contrast_pulse(1,8:end);
+
 n = 20;
-Wn = 0.22;
-b = fir1(n,Wn);
+b_l = fir1(n,0.2,'low');
+b_h = fir1(n,[0.2, 0.25]);
 
-% figure();plot(abs(fft(mov_y_comp_contrast-mean(mov_y_comp_contrast))));
-% figure();plot(abs(fft(mov_x_comp_contrast-mean(mov_x_comp_contrast))));
+mov_y_comp_contrast_ventilator = filter(b_l,1,mov_y_comp_contrast_ventilator,[],2);
+mov_y_comp_contrast_ventilator = mov_y_comp_contrast_ventilator(n/2:end);
 
-mov_y_comp_contrast = filter(b,1,mov_y_comp_contrast,[],2);
-mov_y_comp_contrast = mov_y_comp_contrast(n/2:end);
-mov_y_comp_contrast = round(mov_y_comp_contrast);
-mov_x_comp_contrast = filter(b,1,mov_x_comp_contrast,[],2);
-mov_x_comp_contrast = mov_x_comp_contrast(n/2:end);
-mov_x_comp_contrast = round(mov_x_comp_contrast);
-[P,Q]= rat(47/50);
-mov_y_comp_contrast = resample(mov_y_comp_contrast,P,Q);
+mov_x_comp_contrast_ventilator = filter(b_l,1,mov_x_comp_contrast_ventilator,[],2);
+mov_x_comp_contrast_ventilator = mov_x_comp_contrast_ventilator(n/2:end);
+
+mov_y_comp_contrast_pulse = filter(b_h,1,mov_y_comp_contrast_pulse,[],2);
+mov_y_comp_contrast_pulse = mov_y_comp_contrast_pulse(n/2:end);
+
+mov_x_comp_contrast_pulse = filter(b_h,1,mov_x_comp_contrast_pulse,[],2);
+mov_x_comp_contrast_pulse = mov_x_comp_contrast_pulse(n/2:end);
+
+
+% resample ventilator
+corr_max = 0;
+for i = 200:1500
+    [P,Q]= rat(i/500);
+    temp = resample(mov_y_comp_contrast_ventilator,P,Q);
+    if max(crosscorr(axial_mov,temp,100)) > corr_max
+        corr_max = max(crosscorr(axial_mov,temp,100));
+        i_max = i;
+    end
+end
+[P,Q]= rat(474/500);
+mov_y_comp_contrast_ventilator = resample(mov_y_comp_contrast_ventilator,P,Q);
+mov_y_comp_contrast_ventilator = round(mov_y_comp_contrast_ventilator);
+
+mov_x_comp_contrast_ventilator = resample(mov_x_comp_contrast_ventilator,P,Q);
+mov_x_comp_contrast_ventilator = round(mov_x_comp_contrast_ventilator);
+
+% resample pulse
+corr_max = 0;
+for i = 200:1500
+    [P,Q]= rat(i/500);
+    temp = resample(mov_x_comp_contrast_pulse,P,Q);
+    if max(crosscorr(lateral_mov,temp,100)) > corr_max
+        corr_max = max(crosscorr(lateral_mov,temp,100));
+        i_max = i
+    end
+end
+[P,Q]= rat(i_max/500);
+mov_y_comp_contrast_pulse = resample(mov_y_comp_contrast_pulse,P,Q);
+mov_y_comp_contrast_pulse = round(mov_y_comp_contrast_pulse);
+
+mov_x_comp_contrast_pulse = resample(mov_x_comp_contrast_pulse,P,Q);
+mov_x_comp_contrast_pulse = round(mov_x_comp_contrast_pulse);
+
+% figure();crosscorr(axial_mov,mov_y_comp_contrast_ventilator,100);
+% figure();crosscorr(lateral_mov,mov_x_comp_contrast_pulse,150);
+
+% figure();plot(mov_y_comp_contrast_ventilator);
+% figure();plot(mov_x_comp_contrast_ventilator);
+% figure();plot(mov_y_comp_contrast_pulse);
+% figure();plot(mov_x_comp_contrast_pulse);
+
+% figure();plot(abs(fft(mov_y_comp_contrast_ventilator-mean(mov_y_comp_contrast_ventilator))));
+% figure();plot(abs(fft(mov_x_comp_contrast_ventilator-mean(mov_x_comp_contrast_ventilator))));
+% figure();plot(abs(fft(mov_y_comp_contrast_pulse-mean(mov_y_comp_contrast_pulse))));
+% figure();plot(abs(fft(mov_x_comp_contrast_pulse-mean(mov_x_comp_contrast_pulse))));
+
+mov_y_comp_contrast = -mov_y_comp_contrast_ventilator; %- mov_y_comp_contrast_pulse(1:size(mov_y_comp_contrast_ventilator,2));
+mov_x_comp_contrast = -mov_x_comp_contrast_ventilator; % - mov_x_comp_contrast_pulse(1:size(mov_x_comp_contrast_ventilator,2));
+
 % figure();plot(mov_y_comp_contrast);
 % figure();plot(mov_x_comp_contrast);
-figure();crosscorr(axial_mov,mov_y_comp_contrast,100);
-% if max(crosscorr(axial_mov,mov_y_comp_contrast,100)) > corr_max
-%     corr_max = max(crosscorr(axial_mov,mov_y_comp_contrast,100));
-%     i
-% end
-% figure();crosscorr(lateral_mov,mov_x_comp_contrast,100);
 % figure();plot(abs(fft(mov_y_comp_contrast-mean(mov_y_comp_contrast))));
 % figure();plot(abs(fft(mov_x_comp_contrast-mean(mov_x_comp_contrast))));
-% end
+
 %% Calculate fft
 mov_y_frq = [];
 for idx_wind = 1:size(img_wind_cord,1)
@@ -434,7 +488,7 @@ for n = 5
             case 3
                 % Window compensated avg
                 img_new_temp = abs(H.img_new_template(idx_frame, idx_wind, mode));
-                img_new_temp_comp = imtranslate(img_new_temp,[(mov_x_comp_contrast(idx_frame-start_frame+1)),(mov_y_comp_contrast(idx_frame-start_frame+1))]);
+                img_new_temp_comp = imtranslate(img_new_temp,[(mov_x_comp_contrast_pulse(idx_frame-start_frame+1)),(mov_y_comp_contrast_ventilator(idx_frame-start_frame+1))]);
 %                 img_new_temp_comp = imtranslate(img_new_temp,[round(mov_x_comp_contrast(idx_frame-start_frame+1)),round(mov_y_comp_contrast(idx_frame-start_frame+1))]);
                 hAx = imagesc(img_new_temp_comp); colormap(gray);
                 pause(0.3);
@@ -459,38 +513,13 @@ for n = 5
     close(gcf)
     close(outputVideo);
 end
-%% Movement to vector list
-mov_x_grid = [];
-mov_y_grid = [];
-for idx_frame = 1:size(mov_y_mean,2)
-    for idx = 1:size(mov_y_mean,1)
-        [x,y] = ind2sub(size(X),idx);
-        mov_x_grid(idx_frame,x,y) = mov_x_comp(idx,idx_frame);
-        mov_y_grid(idx_frame,x,y) = mov_y_comp(idx,idx_frame);
-       
-    end
-end
-
-vel_x_grid = mov_x_grid;
-vel_y_grid = mov_y_grid;
-%% Velocity to vector list
-vel_x_grid = [];
-vel_y_grid = [];
-for idx_frame = 1:size(vel_y_mean,2)
-    for idx = 1:size(vel_y_mean,1)
-        [x,y] = ind2sub(size(X),idx);
-        vel_x_grid(idx_frame,x,y) = vel_x_mean(idx,idx_frame);
-        vel_y_grid(idx_frame,x,y) = vel_y_mean(idx,idx_frame);
-       
-    end
-end
 
 %% Movement to vector list
 mov_x_grid = [];
 mov_y_grid = [];
 for idx_frame = 1:size(mov_y_comp,2)
     for idx = 1:size(mov_y_comp,1)
-        [x,y] = ind2sub(size(X),idx);
+        [x,y] = ind2sub(size(X_comp),idx);
         mov_x_grid(idx_frame,x,y) = mov_x_comp(idx,idx_frame);
         mov_y_grid(idx_frame,x,y) = mov_y_comp(idx,idx_frame);
        
@@ -504,7 +533,7 @@ vel_x_grid = [];
 vel_y_grid = [];
 for idx_frame = 1:size(vel_y_mean,2)
     for idx = 1:size(vel_y_mean,1)
-        [x,y] = ind2sub(size(X),idx);
+        [x,y] = ind2sub(size(X_comp),idx);
         vel_x_grid(idx_frame,x,y) = vel_x_mean(idx,idx_frame);
         vel_y_grid(idx_frame,x,y) = vel_y_mean(idx,idx_frame);
        
@@ -518,15 +547,20 @@ outputVideo.FrameRate=1;
 open(outputVideo);
 mov(1:200)= struct('cdata',[],'colormap',[]);
 pause(0.2)
+img = abs(load_img_B_mode(1));
+norm = max(img(:));
 for i = 1:size(vel_y_grid,1)
     % Full img non-compensated
     img = abs(load_img_B_mode(1));
     limg=20*log10(img/norm);
-    hAx = imagesc(limg, [-40 0]); colormap(gray);
+    hAx = imagesc(limg, [-30 0]); colormap(gray);
     title(['Frame' num2str(i,'%d')]); 
     hold on
     % Quiver plot
-    q_plot = quiver(X_comp(:)',Y_comp(:)',squeeze(vel_x_grid(i,:,:))*5,squeeze(vel_y_grid(i,:,:))*20);
+    temp_x = squeeze(vel_x_grid(i,:,:));
+    temp_y = squeeze(vel_y_grid(i,:,:));
+    
+    q_plot = quiver(X_comp(:),Y_comp(:),temp_x(:)*5,temp_y(:)*20);
 %     q_plot.AutoScaleFactor = 10;
     q_plot.MaxHeadSize = 0.3;
     q_plot.ShowArrowHead = 'on';
