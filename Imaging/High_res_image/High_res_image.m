@@ -14,10 +14,11 @@ MB_log_copy = MB_log;
 
 % check age condition
 for MB_index = 1:size(MB_log_copy,2)
-   if (MB_log_copy(MB_index).age(3) > MB_age_condition)
+   if (MB_log_copy(MB_index).age(3) >= MB_age_condition_min) && (MB_log_copy(MB_index).age(3) <= MB_age_condition_max)
     MB_index_filter_age = [MB_index_filter_age, MB_index];
    end
 end
+
 
 for i = 1:size(MB_index_filter_age,2)
     MB_index = MB_index_filter_age(i);
@@ -28,7 +29,7 @@ end
 
 % idx_temp_del = [];
 % for MB_index = 1:size(MB_log_copy,2)
-%     if (MB_log_copy(MB_index).age(3) > MB_age_condition) && (max(MB_log_copy(MB_index).count(:)) <= MB_count_condition)
+%     if (MB_log_copy(MB_index).age(3) > MB_age_condition_min) && (max(MB_log_copy(MB_index).count(:)) <= MB_count_condition)
 %         MB_vel_x = MB_log_copy(MB_index).vel(:,2);
 %         MB_vel_y = MB_log_copy(MB_index).vel(:,1);
 %         
@@ -258,15 +259,33 @@ end
 
 
  %-----------------------------
+ n_vel_avg = 9;
+ % Smooth velocities
+ for i = 1:size(MB_index_filter_single,2)
+     MB_index = MB_index_filter_single(i);
+    for j = 1:MB_log_copy(MB_index).age(3)-1
+        if j-(n_vel_avg-1)/2 < 1
+            MB_log_copy(MB_index).vel(j,1) = sum(MB_log_copy(MB_index).vel(1:1+(n_vel_avg-1),1))/n_vel_avg;
+            MB_log_copy(MB_index).vel(j,2) = sum(MB_log_copy(MB_index).vel(1:1+(n_vel_avg-1),2))/n_vel_avg;
+        elseif j+(n_vel_avg-1)/2 > MB_log_copy(MB_index).age(3)-1
+            MB_log_copy(MB_index).vel(j,1) = sum(MB_log_copy(MB_index).vel(MB_log_copy(MB_index).age(3)-1-(n_vel_avg-1):MB_log_copy(MB_index).age(3)-1,1))/n_vel_avg;
+            MB_log_copy(MB_index).vel(j,2) = sum(MB_log_copy(MB_index).vel(MB_log_copy(MB_index).age(3)-1-(n_vel_avg-1):MB_log_copy(MB_index).age(3)-1,2))/n_vel_avg;
+        else
+            MB_log_copy(MB_index).vel(j,1) = sum(MB_log_copy(MB_index).vel(j-(n_vel_avg-1)/2:j+(n_vel_avg-1)/2,1))/n_vel_avg;
+            MB_log_copy(MB_index).vel(j,2) = sum(MB_log_copy(MB_index).vel(j-(n_vel_avg-1)/2:j+(n_vel_avg-1)/2,2))/n_vel_avg;
+        end
+    end
+ end
+ 
 % List of MB positions and their velocities satisfying conditions
 MB_index_list = [];
 MB_vel_list = [];
 for i = 1:size(MB_index_filter_single,2)
   MB_index = MB_index_filter_single(i);
   MB_index_list = [MB_index_list, sub2ind([img_size(1:2)],MB_log_copy(MB_index).centroid(2:end-1,1) ,MB_log_copy(MB_index).centroid(2:end-1,2))'];
-  MB_vel_list = [MB_vel_list, [MB_log_copy(MB_index).centroid(3:end,1)-MB_log_copy(MB_index).centroid(2:end-1,1),MB_log_copy(MB_index).centroid(3:end,2)-MB_log_copy(MB_index).centroid(2:end-1,2)]'];
+  MB_vel_list = [MB_vel_list, [MB_log_copy(MB_index).vel(2:end,1),MB_log_copy(MB_index).vel(2:end,2)]'];
 end
-      
+ 
 % Scatter image from all MB locations
 scatter_matrix = zeros([img_size(1:2)]); 
 for i = 1:size(MB_index_list,2)
@@ -407,8 +426,8 @@ set(fig,'MarkerFacecolor','flat'); % appearance of dots
 fig.CData = dir_color(vel_dir_img_list_val,:); % setting colors of individual dots depending on direction
 
 xlabel('Lateral [mm]'); ylabel('Axial [mm]'); % title('Micro-Bubble image');
-set(gca,'Xtick',linspace(0,1189,5)); set(gca, 'XTickLabel',linspace(0,12,5));
-set(gca,'Ytick',linspace(0,2489,6)); set(gca, 'YTickLabel',linspace(0,25,6));
+set(gca,'Xtick',linspace(1,450,10)); set(gca, 'XTickLabel',linspace(0,4.5,10));
+set(gca,'Ytick',linspace(1,200,6)); set(gca, 'YTickLabel',linspace(0,2,6));
 set(gca, 'DataAspectRatio',[1 1 1]) % set data aspect ratio in zoom box
 set(gca, 'PlotBoxAspectRatio',[1 1 1])
 xlim([1 img_size(2)]);
@@ -449,7 +468,7 @@ rgbImage = hsv2rgb(hsvImage);
 
 hold on
 % Position Colorwheel
-ac = axes('Position',[0.4740 0.1120 0.153 0.153]);
+ac = axes('Position',[0.7640 0.2720 0.153 0.153]);
 
 % Show colorwheel
 imshow(rgbImage);
@@ -504,7 +523,7 @@ fh = figure(); clf;
 set(fh,'position',[-1850 570 560 420]);
 
 % Max and min value for colormap
-val_range_max = 3;
+val_range_max = 1;
 val_range_min = 0;
 
 % Fitting data within max and min into colormap size
@@ -526,8 +545,8 @@ fig.CData = vel_color(vel_abs_img_list_val,:) % setting colors of individual dot
 %ylim([yt,yb]);
 % axis labeling
 xlabel('Lateral (mm)'); ylabel('Axial (mm)'); % title('Micro-Bubble image');
-%set(gca,'Xtick',linspace(0,300,4)); set(gca, 'XTickLabel',linspace(0,3,4));
-%set(gca,'Ytick',linspace(0,900,10)); set(gca, 'YTickLabel',linspace(0,9,10));
+set(gca,'Xtick',linspace(1,450,10)); set(gca, 'XTickLabel',linspace(0,4.5,10));
+set(gca,'Ytick',linspace(1,200,6)); set(gca, 'YTickLabel',linspace(0,2,6));
 xlim([1 img_size(2)]);
 ylim([1 img_size(1)]);
 
@@ -595,7 +614,7 @@ MB_log_copy = MB_log;
 MB_index_list = [];
 
 for MB_index = 1:size(MB_log_copy,2)
-%    if (MB_log_copy(MB_index).age(3) >= MB_age_condition) && (max(MB_log_copy(MB_index).count(:)) <= MB_count_condition)
+%    if (MB_log_copy(MB_index).age(3) >= MB_age_condition_min) && (max(MB_log_copy(MB_index).count(:)) <= MB_count_condition)
        MB_index_list = [MB_index_list, sub2ind([img_size(1:2)],MB_log_copy(MB_index).centroid(:,1) ,MB_log_copy(MB_index).centroid(:,2))'];
 %    end
 end
