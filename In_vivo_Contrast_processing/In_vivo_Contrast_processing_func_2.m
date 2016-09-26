@@ -14,7 +14,7 @@ MB_window_threshold = 1.3; % Window Threshold (actual MB_window_threshold = Max_
 MB_window_out_of_bounce = 0; % Checks if search windows is outside image
 
 n_bck = 50; 
-v_MB = 0.2*10^(-3);
+v_MB = 0.5*10^(-3);
 nframe = 1000;
 idx_frame_start = idx_frame_start;%4550;%3970;
 idx_comp_sync = 900;
@@ -40,7 +40,7 @@ tic
 for idx_frame=idx_frame_start:idx_frame_start+nframe
     idx_frame
     % Load img
-    img = load_img_contrast(idx_frame,idx_comp_sync,n_bck,v_MB,mov_x_comp_contrast,mov_y_comp_contrast);
+    img = load_img_contrast_2(idx_frame,idx_comp_sync,n_bck,v_MB,mov_x_comp_contrast,mov_y_comp_contrast);
 
     % Calculate threshold
     SEM = std(img(:));

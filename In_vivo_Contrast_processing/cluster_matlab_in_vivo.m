@@ -11,7 +11,7 @@ DataLocation = '/data/cfudata6/s134082/cluster_temp';
 sched = cluster_init('fcfu11',DataLocation);
 % sched.ClusterMatlabRoot = '/usr/local/matlabR2010b_64bit';
 global additionalSubmitArgs;
-additionalSubmitArgs = '--cpus-per-task=2 --mem-per-cpu=400 --exclude=fcfu1,fcfu9 --nice=-10000';
+additionalSubmitArgs = '--cpus-per-task=2 --mem-per-cpu=400 --exclude=fcfu1,fcfu5,fcfu6,fcfu9 --nice=-10000';
 
 % There is no limit on only assigning one job!
 % you can assign as many jobs as you want and therefore assign many tasks
@@ -24,14 +24,12 @@ job = createJob(sched);
 % /home/username/Documents/MATLAB/startup.m
 
 %%
-v_MB = 0.1*10^(-3):0.3*10^(-3):1.3*10^(-3);
-nframe = 100:100:3000;
 
-for i=1:size(v_MB,2)
-    for j = 1:size(nframe,2)
-        disp(sprintf('Task:%d',(size(nframe,2)*(i-1)+j)));
-        createTask(job, @In_vivo_Contrast_processing_func, 2, {v_MB(i), nframe(j), (size(nframe,2)*(i-1)+j)});
-    end
+idx_frame_start = 1000:1000:36000;
+
+for i=1:size(idx_frame_start,2)
+        disp(sprintf('Task:%d',i));
+        createTask(job, @In_vivo_Contrast_processing_func_1, 2, {idx_frame_start(i), i});
 end
 
 %%
@@ -70,8 +68,11 @@ for i = 1:size(data,2)
 %         disp(['Index ' num2str(i,'%d') ' not correct'])
 %     end
 end
-
-MB_log = data{1,5}{1,1}{1};
-
+%%
+MB_log = [];
+for i = 1:36
+    load(['Task' num2str(i,'%d') '.out.mat'])
+    MB_log = [MB_log argsout{1,1}{1,1}];
+end
 
 

@@ -4,10 +4,10 @@ filename = '/data/cfudata6/s134082/micro_bubble_data/mat_files/2016_04_21_15_29_
 
 % img size from beamforming
 % img_size = [684,123];% Contrast
-img_size = [1, 1; 489, 61];% Contrast half removed
+%img_size = [1, 1; 489, 61];% Contrast half removed
 %img_size = [170, 5; 210, 28];% Small area with horizontal MB between 3970-4100
-% img_size = [275, 15; 305, 23];% Small area with vertical MB between 4045-4100
-
+img_size = [150, 18; 170, 22];% Small area with vertical MB between 4045-4100
+% img_size = [182, 27; 194, 37];
 
 interpolation_type = 'spline';
 interpolation_factor_y = 5.1;
@@ -45,8 +45,8 @@ Wn_cut = Wn_cut/(size(gauss_fft_norm,2)/2);
 
 % Create filter
 n_filter_1 = 100;
-Wn_design = [0 Wn_cut-0.1*Wn_cut Wn_cut+0.1*Wn_cut 1];
-mag = [1 1 0 0];
+Wn_design = [0 0.01 0.02 Wn_cut-0.1*Wn_cut Wn_cut+0.1*Wn_cut 1];
+mag = [0 0 1 1 0 0];
 h_bandpass = fir2(n_filter_1,Wn_design,mag);
 h_bandpass_flip = fliplr(h_bandpass);
 
@@ -72,13 +72,13 @@ for idx_load = idx_frame-n_filter_1/2:idx_frame+n_filter_1/2
 
     img_comp = img;
     
-%     % compensated in axial direction
-%     img_comp = zeros(size(img));
-%     if mov_y_comp_contrast(idx_comp) < 0
-%         img_comp(1:end+mov_y_comp_contrast(idx_comp),:)=img(-mov_y_comp_contrast(idx_comp)+1:end,:);
-%     else
-%         img_comp(mov_y_comp_contrast(idx_comp)+1:end,:)=img(1:end-mov_y_comp_contrast(idx_comp),:);
-%     end
+    % compensated in axial direction
+    img_comp = zeros(size(img));
+    if mov_y_comp_contrast(idx_comp) < 0
+        img_comp(1:end+mov_y_comp_contrast(idx_comp),:)=img(-mov_y_comp_contrast(idx_comp)+1:end,:);
+    else
+        img_comp(mov_y_comp_contrast(idx_comp)+1:end,:)=img(1:end-mov_y_comp_contrast(idx_comp),:);
+    end
 %     % compensated in lateral direction
 %     if mov_x_comp_contrast(idx_comp) < 0
 %         img_comp(:,1:end+mov_x_comp_contrast(idx_comp))=img_comp(:,-mov_x_comp_contrast(idx_comp)+1:end);
@@ -94,7 +94,13 @@ for idx_load = idx_frame-n_filter_1/2:idx_frame+n_filter_1/2
     filt_img = filt_img + img_comp*h_bandpass_flip(idx_filt);
     idx_filt = idx_filt + 1;
 end
-% fore_grnd_img = abs(filt_img-bck_grnd_img);
+
+% idx_load = idx_frame;
+% load([filename num2str(idx_load,'%d') '.mat'],'img');
+% img = img(img_size(1,1):img_size(2,1),img_size(1,2):img_size(2,2))-bck_grnd_img;
+%     img = interp2(X,Y,img,Xq,Yq,interpolation_type);
+% filt_img = img;
+
 
 fore_grnd_img = abs(filt_img);
 end

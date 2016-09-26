@@ -38,36 +38,48 @@ classdef block_matching
                 motion_y = max_y(1)-obj.max_mov_y-1;
                 motion_x = max_x(1)-obj.max_mov_x-1;
             elseif strcmp(obj.cost_function, 'xCorr')
-                % Matlab 2d NCC
-                for i = 1:size(img_new,2)
+                for i = 1:obj.max_mov_x*2+1
                     c = [];
                     lag = [];
-                    for j = 1:obj.max_mov_x*2+1
-                        [c(:,j) lag(:,j)] = crosscorr(img_new(:,i),img_ref(:,j+i-1),obj.max_mov_y*2);
-                        %                      figure();crosscorr(img_new,img_ref(:,i),obj.max_mov_y*2);
+                    for j = 1:size(img_new,2)
+                        [c(:,j) lag(:,j)] = crosscorr(img_new(:,j),img_ref(:,j+i-1),obj.max_mov_y*2);
                     end
                     c = c((size(c,1)-1)/2+1:(size(c,1)-1)/2+1+2*obj.max_mov_y,:);
-                    [max_y max_x] = peak_estimation(c, 'max');
-                    motion_x_temp(i) = max_x(1)-obj.max_mov_x-1;
+                    c = mean(c',1)';
+                    c_mean(:,i) = c;
                 end
-                motion_x = mean(motion_x_temp);
-                
-                c = [];
-                lag = [];
-                for i = 1:size(img_new,2)                 
-                    [c(:,i) lag(:,i)] = crosscorr(img_new(:,i),img_ref(:,obj.max_mov_x+i),obj.max_mov_y*2);
-%                     figure();crosscorr(img_new,img_ref(:,i),obj.max_mov_y*2);
-                end
-                c = c((size(c,1)-1)/2+1:(size(c,1)-1)/2+1+2*obj.max_mov_y,:);
-                c = mean(c',1)';    
-                [max_y max_x] = peak_estimation(c, 'max');
+                [max_y max_x] = peak_estimation(c_mean, 'max');
+                motion_x = max_x(1)-obj.max_mov_x-1;
                 motion_y = max_y(1)-obj.max_mov_y-1;
-               
-                %----
-%                 c_axial_mean = mean(c',1);
-%                 [max_y max_x] = peak_estimation(c_axial_mean', 'max');
+%                 for i = 1:size(img_new,2)
+%                     c = [];
+%                     lag = [];
+%                     for j = 1:obj.max_mov_x*2+1
+%                         [c(:,j) lag(:,j)] = crosscorr(img_new(:,i),img_ref(:,j+i-1),obj.max_mov_y*2);
+%                         %                      figure();crosscorr(img_new,img_ref(:,i),obj.max_mov_y*2);
+%                     end
+%                     c = c((size(c,1)-1)/2+1:(size(c,1)-1)/2+1+2*obj.max_mov_y,:);
+%                     [max_y max_x] = peak_estimation(c, 'max');
+%                     motion_x_temp(i) = max_x(1)-obj.max_mov_x-1;
+%                 end
+%                 motion_x = mean(motion_x_temp);
+%                 
+%                 c = [];
+%                 lag = [];
+%                 for i = 1:size(img_new,2)                 
+%                     [c(:,i) lag(:,i)] = crosscorr(img_new(:,i),img_ref(:,obj.max_mov_x+i),obj.max_mov_y*2);
+% %                     figure();crosscorr(img_new,img_ref(:,i),obj.max_mov_y*2);
+%                 end
+%                 c = c((size(c,1)-1)/2+1:(size(c,1)-1)/2+1+2*obj.max_mov_y,:);
+%                 c = mean(c',1)';    
+%                 [max_y max_x] = peak_estimation(c, 'max');
 %                 motion_y = max_y(1)-obj.max_mov_y-1;
-                %----
+%                
+%                 %----
+% %                 c_axial_mean = mean(c',1);
+% %                 [max_y max_x] = peak_estimation(c_axial_mean', 'max');
+% %                 motion_y = max_y(1)-obj.max_mov_y-1;
+%                 %----
                 
             else
                 % Cost matrix

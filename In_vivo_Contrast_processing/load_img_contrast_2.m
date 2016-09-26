@@ -45,8 +45,8 @@ Wn_cut = Wn_cut/(size(gauss_fft_norm,2)/2);
 
 % Create filter
 n_filter_1 = 100;
-Wn_design = [0 Wn_cut-0.1*Wn_cut Wn_cut+0.1*Wn_cut 1];
-mag = [1 1 0 0];
+Wn_design = [0 0.09 0.1 Wn_cut-0.1*Wn_cut Wn_cut+0.1*Wn_cut 1];
+mag = [0 0 1 1 0 0];
 h_bandpass = fir2(n_filter_1,Wn_design,mag);
 h_bandpass_flip = fliplr(h_bandpass);
 

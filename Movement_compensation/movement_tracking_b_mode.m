@@ -5,7 +5,7 @@ img_wind_cord = zeros(1,4);
 idx_wind = 1;
 
 for i = 1:1:1
-    img_wind_cord(idx_wind,:) = [250 450 129 131];
+    img_wind_cord(idx_wind,:) = [400 410 110 130]%[250 450 129 131];
     idx_wind = idx_wind + 1;
 end
 
@@ -46,7 +46,7 @@ for idx_wind = 1:size(img_wind_cord,1)
     rectangle_corr(idx_wind,:) = [img_wind_cord(idx_wind,3), img_wind_cord(idx_wind,1), img_wind_cord(idx_wind,4)-img_wind_cord(idx_wind,3), img_wind_cord(idx_wind,2)-img_wind_cord(idx_wind,1)];
 end
 % Full image
-img_disp = load_img_B_mode(1);
+img_disp = load_img_B_mode(1000);
 figure(5); clf;
 norm = max(abs(img_disp(:)));
 limg=20*log10(abs(img_disp)/norm);
@@ -118,8 +118,14 @@ end
 
 
 % Filter pulse away
+% n = 20;
+% b_l = fir1(n,0.05,'low');
+
+%---
 n = 20;
-b_l = fir1(n,0.05,'low');
+b_l = fir1(n,0.05,'high');
+
+%---
 
 vel_y_ventilator = filter(b_l,1,vel_y,[],2)*1.22; %1.22 = damping factor from filter
 vel_y_ventilator = vel_y_ventilator(:,n/2:end);
@@ -145,7 +151,7 @@ vel_x_pulse = vel_x_pulse(:,n/2:end);
 %% Interpolate velocity ventilator
 interpolate_factor = 10;
 f_rep_ventilator = 430;
-rep_factor_ventilator = 100;
+rep_factor_ventilator = 3%;1000;
 vel_yy = spline(1:size(vel_y_ventilator,2),vel_y_ventilator,1:1/interpolate_factor:size(vel_y_ventilator,2));
 vel_xx = spline(1:size(vel_x_ventilator,2),vel_x_ventilator,1:1/interpolate_factor:size(vel_x_ventilator,2));
 
@@ -255,7 +261,7 @@ vel_x_mean_ventilator = spline(linspace(1,f_rep_ventilator/interpolate_factor*re
 %% Interpolate velocity pulse
 interpolate_factor = 10;
 f_rep_pulse = 86;
-rep_factor_pulse = rep_factor_ventilator*ceil(f_rep_ventilator/f_rep_pulse);
+rep_factor_pulse = 5;%rep_factor_ventilator*ceil(f_rep_ventilator/f_rep_pulse);
 vel_yy = spline(1:size(vel_y_pulse,2),vel_y_pulse,1:1/interpolate_factor:size(vel_y_pulse,2));
 vel_xx = spline(1:size(vel_x_pulse,2),vel_x_pulse,1:1/interpolate_factor:size(vel_x_pulse,2));
 
@@ -371,14 +377,14 @@ mov_x_comp_ventilator = zeros(size(vel_x_mean_ventilator,1),size(vel_x_mean_vent
 for idx_wind = 1:size(vel_y_mean_ventilator,1)
     for idx_frame = start_frame:start_frame+size(mov_y_comp_ventilator,2)-2;
         mov_y_comp_ventilator(idx_wind,idx_frame-start_frame+2) = sum(vel_y_mean_ventilator(idx_wind,1:idx_frame-start_frame+1));
-        mov_x_comp_ventilator(idx_wind,idx_frame-start_frame+2) = sum(vel_x_mean_ventilator(idx_wind,1:idx_frame-start_frame+1));
+       % mov_x_comp_ventilator(idx_wind,idx_frame-start_frame+2) = sum(vel_x_mean_ventilator(idx_wind,1:idx_frame-start_frame+1));
     end
 end
 
 mov_y_comp_pulse = zeros(size(vel_y_mean_pulse,1),size(vel_y_mean_pulse,2)+1);
 mov_x_comp_pulse = zeros(size(vel_x_mean_pulse,1),size(vel_x_mean_pulse,2)+1);
 
-for idx_wind = 1:size(vel_y_mean,1)
+for idx_wind = 1:size(vel_y_mean_pulse,1)
     for idx_frame = start_frame:start_frame+size(mov_y_comp_pulse,2)-2;
         mov_y_comp_pulse(idx_wind,idx_frame-start_frame+2) = sum(vel_y_mean_pulse(idx_wind,1:idx_frame-start_frame+1));
         mov_x_comp_pulse(idx_wind,idx_frame-start_frame+2) = sum(vel_x_mean_pulse(idx_wind,1:idx_frame-start_frame+1));
@@ -389,7 +395,7 @@ end
 % figure();plot(mov_x_comp);
 
 idx_contrast = sub2ind(size(X_comp),4,6);
-
+%%
 % Ventilator
 mov_y_comp_contrast_ventilator = [];
 mov_x_comp_contrast_ventilator = [];
@@ -397,30 +403,34 @@ mov_x_comp_contrast_ventilator = [];
 mov_y_comp_contrast_ventilator = -mov_y_comp_ventilator(idx_contrast,:)*2.55;
 mov_x_comp_contrast_ventilator = -mov_x_comp_ventilator(idx_contrast,:)*4.3;
 
-mov_y_comp_contrast_ventilator = mov_y_comp_contrast_ventilator(1,34:end);
-mov_x_comp_contrast_ventilator = mov_x_comp_contrast_ventilator(1,34:end);
+mov_y_comp_contrast_ventilator = mov_y_comp_contrast_ventilator(1,43:end);
+mov_x_comp_contrast_ventilator = mov_x_comp_contrast_ventilator(1,43:end);
 
 % resample ventilator
-corr_max = 0;
-for i = 300:700
-    [P,Q]= rat(i/500);
-    temp = resample(mov_y_comp_contrast_ventilator,P,Q);
-    if max(crosscorr(axial_mov-mean(axial_mov),temp-mean(temp),100)) > corr_max
-        corr_max = max(crosscorr(axial_mov,temp,100));
-        i_max = i;
-    end
-end
+% corr_max = 0;
+% for i = 500:1100
+%     [P,Q]= rat(i/1000);
+%     temp = resample(mov_y_comp_contrast_ventilator,P,Q);
+%     if max(crosscorr(axial_mov-mean(axial_mov),temp-mean(temp),100)) > corr_max
+%         corr_max = max(crosscorr(axial_mov,temp,100));
+%         i_max = i
+%     end
+% end
 
-[P,Q]= rat(470/500);
-mov_y_comp_contrast_ventilator = resample(mov_y_comp_contrast_ventilator,P,Q);
-mov_y_comp_contrast_ventilator = round(mov_y_comp_contrast_ventilator-mean(mov_y_comp_contrast_ventilator));
+[P,Q]= rat(939/1000);
+mov_y_comp_contrast_ventilator_resample = resample(mov_y_comp_contrast_ventilator,P,Q);
+mov_y_comp_contrast_ventilator_resample = round(mov_y_comp_contrast_ventilator_resample-mean(mov_y_comp_contrast_ventilator_resample));
 
-mov_x_comp_contrast_ventilator = resample(mov_x_comp_contrast_ventilator,P,Q);
-mov_x_comp_contrast_ventilator = round(mov_x_comp_contrast_ventilator);
+mov_x_comp_contrast_ventilator_resample = resample(mov_x_comp_contrast_ventilator,P,Q);
+mov_x_comp_contrast_ventilator_resample = round(mov_x_comp_contrast_ventilator_resample);
 
-figure(); crosscorr(axial_mov,mov_y_comp_contrast_ventilator,100);
-mov_y_comp_contrast_ventilator = -mov_y_comp_contrast_ventilator;
-mov_x_comp_contrast_ventilator = -mov_x_comp_contrast_ventilator;
+figure(); crosscorr(axial_mov,mov_y_comp_contrast_ventilator_resample,100);
+mov_y_comp_contrast_ventilator_resample = -mov_y_comp_contrast_ventilator_resample;
+mov_x_comp_contrast_ventilator_resample = -mov_x_comp_contrast_ventilator_resample;
+
+mov_y_comp_contrast = mov_y_comp_contrast_ventilator_resample;% + mov_y_comp_contrast_pulse(1,1:size(mov_y_comp_contrast_ventilator,2));
+mov_x_comp_contrast = zeros(size(mov_y_comp_contrast_ventilator_resample));%mov_x_comp_contrast_pulse;
+
 
 %% Pulse
 mov_y_comp_contrast_pulse = [];

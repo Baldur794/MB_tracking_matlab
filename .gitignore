@@ -4,3 +4,5 @@
 *.fig
 *.pdf
 *.gz
+*.png
+*.eps

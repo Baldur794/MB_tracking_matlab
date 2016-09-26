@@ -40,7 +40,7 @@ tic
 for idx_frame=idx_frame_start:idx_frame_start+nframe
     idx_frame
     % Load img
-    img = load_img_contrast(idx_frame,idx_comp_sync,n_bck,v_MB,mov_x_comp_contrast,mov_y_comp_contrast);
+    img = load_img_contrast_1(idx_frame,idx_comp_sync,n_bck,v_MB,mov_x_comp_contrast,mov_y_comp_contrast);
 
     % Calculate threshold
     SEM = std(img(:));
