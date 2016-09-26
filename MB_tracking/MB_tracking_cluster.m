@@ -1,3 +1,4 @@
+%% Cluster
 % $Revision: 1.1 $  $Date: 02/13/14 13:10:27 $
 
 % This is an example usage of running the tasks over the cluster.
@@ -25,11 +26,11 @@ job = createJob(sched);
 
 %%
 
-idx_frame_start = 1000:1000:36000;
+idx_frame_start = 1000:1000:37000;
 
 for i=1:size(idx_frame_start,2)
         disp(sprintf('Task:%d',i));
-        createTask(job, @In_vivo_Contrast_processing_func_1, 2, {idx_frame_start(i), i});
+        createTask(job, @MB_tracking_func_4, 2, {idx_frame_start(i), i});
 end
 
 %%
@@ -70,7 +71,7 @@ for i = 1:size(data,2)
 end
 %%
 MB_log = [];
-for i = 1:36
+for i = 1:1
     load(['Task' num2str(i,'%d') '.out.mat'])
     MB_log = [MB_log argsout{1,1}{1,1}];
 end

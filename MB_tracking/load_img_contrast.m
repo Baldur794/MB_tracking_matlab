@@ -40,22 +40,12 @@ mag_cut = 0.1;
 Wn_cut = find(abs(gauss_fft_norm) < mag_cut,1);
 Wn_cut = Wn_cut/(size(gauss_fft_norm,2)/2);
 
-% figure(30);plot(gauss);
-% figure(31);plot(abs(gauss_fft_norm));
-
 % Create filter
 n_filter_1 = 100;
 Wn_design = [0 Wn_cut-0.1*Wn_cut Wn_cut+0.1*Wn_cut 1];
 mag = [1 1 0 0];
 h_bandpass = fir2(n_filter_1,Wn_design,mag);
 h_bandpass_flip = fliplr(h_bandpass);
-
-% %----
-% n_filter_2 = 20;
-% % b = fir1(n,[0.05 [0.2 0.9]],'DC-1');
-% b = fir1(n_filter_2,[0.05]);
-% %----
-
 
 [X,Y] = meshgrid(1:img_size(2,2)-img_size(1,2)+1,1:img_size(2,1)-img_size(1,1)+1);
 [Xq,Yq] = meshgrid(1:1/interpolation_factor_x:img_size(2,2)-img_size(1,2)+1,1:1/interpolation_factor_y:img_size(2,1)-img_size(1,1)+1);

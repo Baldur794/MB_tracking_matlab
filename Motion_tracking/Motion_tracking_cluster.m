@@ -1,3 +1,76 @@
+%% Movement tracking B-mode
+% B_mode
+img_wind_cord = zeros(1,4);
+idx_wind = 1;
+
+img_wind_cord(idx_wind,:) = [350   550   114   116]
+
+
+% Max movement y,x
+max_mov_y = 10;
+max_mov_x = 3;
+
+% Setup of block_matching
+fps = 50;
+frames = 250;
+start_frame = 1;
+H = block_matching;
+H.max_mov_y = max_mov_y;
+H.max_mov_x = max_mov_x;
+H.cost_function = 'xCorr';
+H.img_wind_cord = img_wind_cord;
+% mode = 'b_mode';
+
+% Display Windows
+% Dim and corr for boxes
+for idx_wind = 1:size(img_wind_cord,1)               
+    rectangle_corr(idx_wind,:) = [img_wind_cord(idx_wind,3), img_wind_cord(idx_wind,1), img_wind_cord(idx_wind,4)-img_wind_cord(idx_wind,3), img_wind_cord(idx_wind,2)-img_wind_cord(idx_wind,1)];
+end
+
+% Full image
+img_disp = load_img_B_mode(1000);
+figure(5); clf;
+norm = max(abs(img_disp(:)));
+limg=20*log10(abs(img_disp)/norm);
+imagesc(limg,[-40 0]);% xlim([1 size(img,2)]); ylim([1 size(img,1)]);
+colormap('gray'); xlabel('Lateral (mm)'); ylabel('Axial (mm)'); %title('B-mode image');
+set(gca, 'DataAspectRatio',[1 1.67 1]) % set data aspect ratio in zoom box
+set(gca, 'PlotBoxAspectRatio',[1 1 1])
+%set(gca,'Xtick',linspace(0,280,5)); set(gca, 'XTickLabel',linspace(0,12,5));
+%set(gca,'Ytick',linspace(0,1960,6)); set(gca, 'YTickLabel',linspace(0,25,6));
+
+hold on;
+for idx_wind = 1:size(img_wind_cord,1)
+    rectangle('position',rectangle_corr(idx_wind,:),'EdgeColor','r','LineWidth', 2);
+%     text(rectangle_corr(idx_wind,1),rectangle_corr(idx_wind,2)-50, int2str(idx_wind),'Color','r','FontSize',15,'FontWeight','bold');
+end
+set(gcf,'position',[-1850 570 560 420]);
+
+
+%% Displacement             
+vel_y = [];
+vel_x = [];
+
+% Run through all templates
+for idx_wind = 1:size(img_wind_cord,1)
+        % Load ref img
+        idx_frame = start_frame;
+        img_ref_wind = H.img_reference_window(idx_frame, idx_wind);
+        % Repeat for all frames
+        for idx_frame = start_frame:start_frame+frames-1;
+            % Load ref img
+            img_ref_wind = H.img_reference_window(idx_frame, idx_wind);
+            
+            % Load new img
+            img_new_temp = H.img_new_template(idx_frame+1, idx_wind);%--
+            
+            [motion_y motion_x] = H.motion_displacement(img_ref_wind,img_new_temp);
+            vel_y(idx_wind,idx_frame-start_frame+1) = motion_y;
+            vel_x(idx_wind,idx_frame-start_frame+1) = motion_x;
+        end        
+end
+
+%% Cluster part
 % $Revision: 1.1 $  $Date: 02/13/14 13:10:27 $
 
 % This is an example usage of running the tasks over the cluster.
@@ -87,38 +160,4 @@ end
 
 start_frame = 1;
 
-
-%% Imaging
-
-figure(); plot((mov_y_mean()')); legend('1','2','3','4','5','6','7','8','9','10','11','12','13','14','15');
-xlabel('Time (s)'); ylabel('Axial displacement (\mu m)'); 
-title('Axial displacement');
-ylim([-8,12]);% xlim([0,40]);
-set(gca,'Xtick',linspace(0,50,6)); set(gca,'XtickLabel',linspace(0,1,6));
-set(gca,'Ytick',linspace(-8,12,6)); set(gca, 'YTickLabel',linspace(0,250,6));
-%%
-figure(); plot((mov_x_mean()')); legend('1','2','3','4','5','6','7','8','9','10','11','12','13','14','15');
-xlabel('Time (s)'); ylabel('Lateral displacement (\mu m)'); 
-title('Lateral displacement');
-ylim([-3,3]);% xlim([0,40]);
-set(gca,'Xtick',linspace(0,50,6)); set(gca,'XtickLabel',linspace(0,1,6));
-set(gca,'Ytick',linspace(-3,3,6)); set(gca, 'YTickLabel',linspace(0,250,6));
-
-%%
-% Full image
-img_disp = load_img_B_mode(1);
-figure(1); clf;
-norm = max(abs(img_disp(:)));
-limg=20*log10(abs(img_disp)/norm);
-imagesc(limg,[-40 0]);% xlim([1 size(img,2)]); ylim([1 size(img,1)]);
-colormap('gray'); xlabel('Lateral (mm)'); ylabel('Axial (mm)'); %title('B-mode image');
-set(gca,'Ytick',linspace(1,1960,6)); set(gca,'YtickLabel',linspace(0,25,6));
-set(gca,'Xtick',linspace(1,280,6)); set(gca, 'XTickLabel',linspace(0,12,6));
-hold on
-scatter_img = scatter(X_comp(:),Y_comp(:))
-set(scatter_img,'SizeData', 50); % size of dots
-set(scatter_img,'MarkerFacecolor','flat'); % appearance of dots
-% for i = 1:15
-%     text(X(i)-3,Y(i)-35, int2str(i),'Color','r','FontSize',15,'FontWeight','bold');
-% end
 

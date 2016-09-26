@@ -1,104 +1,4 @@
-%% Displacement RF
-
-% B_mode
-img_wind_cord = zeros(1,4);
-idx_wind = 1;
-
-for i = 1:1:1
-    img_wind_cord(idx_wind,:) = [400 410 110 130]%[250 450 129 131];
-    idx_wind = idx_wind + 1;
-end
-
-% img_wind_cord = zeros(1,4);
-% img_wind_cord(1,:) = [500 900 120 140];
-
-% Spinning disk
-% 
-% img_wind_cord =[180,220,10,50
-%                  180,220,350,390
-%                  100,140,25,65
-%                  10,50,180,220
-%                  350,390,180,220];
-
-% img_wind_cord =[370,390,198,198
-%                  370,390,199,199
-%                  370,390,200,200
-%                  370,390,202,202
-%                  370,390,203,203];
-
-max_mov_y = 10;
-max_mov_x = 3;
-
-fps = 50;
-frames = 250;
-start_frame = 1;
-H = block_matching;
-H.max_mov_y = max_mov_y;
-H.max_mov_x = max_mov_x;
-H.cost_function = 'xCorr';
-H.img_wind_cord = img_wind_cord;
-mode = 'b_mode';
-
- % Display Windows
-
-% Dim and corr for boxes
-for idx_wind = 1:size(img_wind_cord,1)               
-    rectangle_corr(idx_wind,:) = [img_wind_cord(idx_wind,3), img_wind_cord(idx_wind,1), img_wind_cord(idx_wind,4)-img_wind_cord(idx_wind,3), img_wind_cord(idx_wind,2)-img_wind_cord(idx_wind,1)];
-end
-% Full image
-img_disp = load_img_B_mode(1000);
-figure(5); clf;
-norm = max(abs(img_disp(:)));
-limg=20*log10(abs(img_disp)/norm);
-imagesc(limg,[-40 0]);% xlim([1 size(img,2)]); ylim([1 size(img,1)]);
-colormap('gray'); xlabel('Lateral (mm)'); ylabel('Axial (mm)'); %title('B-mode image');
-set(gca, 'DataAspectRatio',[1 1.67 1]) % set data aspect ratio in zoom box
-set(gca, 'PlotBoxAspectRatio',[1 1 1])
-%set(gca,'Xtick',linspace(0,280,5)); set(gca, 'XTickLabel',linspace(0,12,5));
-%set(gca,'Ytick',linspace(0,1960,6)); set(gca, 'YTickLabel',linspace(0,25,6));
-
-hold on;
-for idx_wind = 1:size(img_wind_cord,1)
-    rectangle('position',rectangle_corr(idx_wind,:),'EdgeColor','r','LineWidth', 2);
-%     text(rectangle_corr(idx_wind,1),rectangle_corr(idx_wind,2)-50, int2str(idx_wind),'Color','r','FontSize',15,'FontWeight','bold');
-end
-set(gcf,'position',[-1850 570 560 420]);
-
-
-%% Displacement             
-mov_y = [];
-mov_x = [];
-
-% Run through all templates
-for idx_wind = 1:size(img_wind_cord,1)
-        % Load ref img
-        idx_frame = start_frame;
-        img_ref_wind = H.img_reference_window(idx_frame, idx_wind, mode);
-        % Repeat for all frames
-        for idx_frame = start_frame:start_frame+frames-1;
-            % Load ref img
-            img_ref_wind = H.img_reference_window(idx_frame, idx_wind, mode);
-            
-            % Load new img
-            img_new_temp = H.img_new_template(idx_frame+1, idx_wind, mode);%--
-            
-            [motion_y motion_x] = H.motion_displacement(img_ref_wind,img_new_temp);
-            mov_y(idx_wind,idx_frame-start_frame+1) = motion_y;
-            mov_x(idx_wind,idx_frame-start_frame+1) = motion_x;
-        end        
-end
-
-%% Calculate Veloctity (for fixed ref img)
-vel_x = [];
-vel_y = [];
-vel_abs = [];
-for idx_wind = 1:size(img_wind_cord,1)
-    vel_x(idx_wind,:) = mov_x(idx_wind,2:end)-mov_x(idx_wind,1:end-1);
-    vel_y(idx_wind,:) = mov_y(idx_wind,2:end)-mov_y(idx_wind,1:end-1);
-    vel_abs(idx_wind,:) = sqrt(vel_x(idx_wind,:).^2+vel_y(idx_wind,:).^2);
-end
-
-%% Calculate movement (for variable ref img)
+%% Calculate movement
 % vel_x = mov_x;%----
 % vel_y = mov_y;%----
 vel_x = vel_x_raw-repmat(mean(vel_x_raw')',1,size(vel_x_raw,2));
@@ -106,6 +6,8 @@ vel_y = vel_y_raw-repmat(mean(vel_y_raw')',1,size(vel_y_raw,2));
 mov_y = zeros(size(vel_y));
 mov_x = zeros(size(vel_x));
 
+
+% Only for displaying movement compared to ref first image
 for idx_wind = 1:size(vel_y,1)
     for idx_frame = start_frame:start_frame+size(mov_y,2)-1;
         mov_y(idx_wind,idx_frame-start_frame+1) = sum(vel_y(idx_wind,1:idx_frame-start_frame+1));
@@ -117,15 +19,10 @@ end
 % figure();plot(abs(fft(vel_x(idx_contrast,:)-mean(vel_x(idx_contrast,:)))));
 
 
-% Filter pulse away
-% n = 20;
-% b_l = fir1(n,0.05,'low');
-
-%---
+% Filter out pulse
 n = 20;
-b_l = fir1(n,0.05,'high');
+b_l = fir1(n,0.05,'low');
 
-%---
 
 vel_y_ventilator = filter(b_l,1,vel_y,[],2)*1.22; %1.22 = damping factor from filter
 vel_y_ventilator = vel_y_ventilator(:,n/2:end);
@@ -135,9 +32,12 @@ vel_x_ventilator = vel_x_ventilator(:,n/2:end);
 % figure();plot(abs(fft(vel_y_ventilator(idx_contrast,:)-mean(vel_y_ventilator(idx_contrast,:)))));
 % figure();plot(abs(fft(vel_x_ventilator(idx_contrast,:)-mean(vel_x_ventilator(idx_contrast,:)))));
 
-% Filter pulse away
+% Filter out ventilator
 n = 20;
 b_h = fir2(n,[0 0.1 0.15 0.3 0.35 1] ,[0 0 1 1 0 0]);
+% n = 20;
+% b_h = fir1(n,0.05,'high');
+
 
 vel_y_pulse = filter(b_h,1,vel_y,[],2)*1.2; %1.22 = damping factor from filter
 vel_y_pulse = vel_y_pulse(:,n/2:end);
@@ -237,7 +137,6 @@ for idx_wind = 1:size(vel_xx,1)
     end
 end
 
-
 % lateral mean
 lateral_vel_mean = zeros(size(vel_xx,1),size(lateral_vel_list,2));
 lateral_vel_mean = mean(lateral_vel_list,3);
@@ -261,7 +160,7 @@ vel_x_mean_ventilator = spline(linspace(1,f_rep_ventilator/interpolate_factor*re
 %% Interpolate velocity pulse
 interpolate_factor = 10;
 f_rep_pulse = 86;
-rep_factor_pulse = 5;%rep_factor_ventilator*ceil(f_rep_ventilator/f_rep_pulse);
+rep_factor_pulse = rep_factor_ventilator*ceil(f_rep_ventilator/f_rep_pulse);
 vel_yy = spline(1:size(vel_y_pulse,2),vel_y_pulse,1:1/interpolate_factor:size(vel_y_pulse,2));
 vel_xx = spline(1:size(vel_x_pulse,2),vel_x_pulse,1:1/interpolate_factor:size(vel_x_pulse,2));
 
@@ -377,7 +276,7 @@ mov_x_comp_ventilator = zeros(size(vel_x_mean_ventilator,1),size(vel_x_mean_vent
 for idx_wind = 1:size(vel_y_mean_ventilator,1)
     for idx_frame = start_frame:start_frame+size(mov_y_comp_ventilator,2)-2;
         mov_y_comp_ventilator(idx_wind,idx_frame-start_frame+2) = sum(vel_y_mean_ventilator(idx_wind,1:idx_frame-start_frame+1));
-       % mov_x_comp_ventilator(idx_wind,idx_frame-start_frame+2) = sum(vel_x_mean_ventilator(idx_wind,1:idx_frame-start_frame+1));
+        mov_x_comp_ventilator(idx_wind,idx_frame-start_frame+2) = sum(vel_x_mean_ventilator(idx_wind,1:idx_frame-start_frame+1));
     end
 end
 
@@ -395,16 +294,19 @@ end
 % figure();plot(mov_x_comp);
 
 idx_contrast = sub2ind(size(X_comp),4,6);
-%%
+%% Aligning B-mode and contrast data
+offset = 43
 % Ventilator
 mov_y_comp_contrast_ventilator = [];
 mov_x_comp_contrast_ventilator = [];
 
+% Accounting for resolution in B-mode
 mov_y_comp_contrast_ventilator = -mov_y_comp_ventilator(idx_contrast,:)*2.55;
 mov_x_comp_contrast_ventilator = -mov_x_comp_ventilator(idx_contrast,:)*4.3;
 
-mov_y_comp_contrast_ventilator = mov_y_comp_contrast_ventilator(1,43:end);
-mov_x_comp_contrast_ventilator = mov_x_comp_contrast_ventilator(1,43:end);
+% Aligning data to match contrast data
+mov_y_comp_contrast_ventilator = mov_y_comp_contrast_ventilator(1,offset:end);
+mov_x_comp_contrast_ventilator = mov_x_comp_contrast_ventilator(1,offset:end);
 
 % resample ventilator
 % corr_max = 0;
@@ -428,8 +330,8 @@ figure(); crosscorr(axial_mov,mov_y_comp_contrast_ventilator_resample,100);
 mov_y_comp_contrast_ventilator_resample = -mov_y_comp_contrast_ventilator_resample;
 mov_x_comp_contrast_ventilator_resample = -mov_x_comp_contrast_ventilator_resample;
 
-mov_y_comp_contrast = mov_y_comp_contrast_ventilator_resample;% + mov_y_comp_contrast_pulse(1,1:size(mov_y_comp_contrast_ventilator,2));
-mov_x_comp_contrast = zeros(size(mov_y_comp_contrast_ventilator_resample));%mov_x_comp_contrast_pulse;
+% mov_y_comp_contrast = mov_y_comp_contrast_ventilator_resample;% + mov_y_comp_contrast_pulse(1,1:size(mov_y_comp_contrast_ventilator,2));
+% mov_x_comp_contrast = zeros(size(mov_y_comp_contrast_ventilator_resample));%mov_x_comp_contrast_pulse;
 
 
 %% Pulse
@@ -439,8 +341,8 @@ mov_x_comp_contrast_pulse = [];
 mov_y_comp_contrast_pulse = -mov_y_comp_pulse(idx_contrast,:)*2.55;
 mov_x_comp_contrast_pulse = -mov_x_comp_pulse(idx_contrast,:)*4.3;
 
-mov_y_comp_contrast_pulse = mov_y_comp_contrast_pulse(1,38:end);
-mov_x_comp_contrast_pulse = mov_x_comp_contrast_pulse(1,38:end);
+mov_y_comp_contrast_pulse = mov_y_comp_contrast_pulse(1,offset:end);
+mov_x_comp_contrast_pulse = mov_x_comp_contrast_pulse(1,offset:end);
 
 % resample pulse ( lateral)
 % corr_max = 0;
@@ -475,8 +377,8 @@ mov_x_comp_contrast_pulse = round(mov_x_comp_contrast_pulse);
 mov_y_comp_contrast_pulse = -mov_y_comp_contrast_pulse;
 mov_x_comp_contrast_pulse = -mov_x_comp_contrast_pulse;
 
-mov_y_comp_contrast = mov_y_comp_contrast_ventilator;% + mov_y_comp_contrast_pulse(1,1:size(mov_y_comp_contrast_ventilator,2));
-mov_x_comp_contrast = zeros(size(mov_y_comp_contrast_ventilator));%mov_x_comp_contrast_pulse;
+mov_y_comp_contrast = mov_y_comp_contrast_ventilator + mov_y_comp_contrast_pulse(1,1:size(mov_y_comp_contrast_ventilator,2));
+mov_x_comp_contrast = mov_x_comp_contrast_ventilator + mov_x_comp_contrast_pulse(1,1:size(mov_x_comp_contrast_ventilator,2));
 
 
 % figure();plot(mov_y_comp_contrast);
@@ -729,340 +631,3 @@ end
 close(gcf)
 close(outputVideo);
 
-
-%%
-
-headWidth = 5;
-headLength = 5;
-LineLength = 0.05;
-
-figure(102); clf
-xlim([0 3])
-ylim([0 2])
-%set(gca, 'DataAspectRatio',[1 1 1]) % set data aspect ratio in zoom box
-%set(gca, 'PlotBoxAspectRatio',[1 1 1])
-%axis off;
-title('Quiver - annotations ','FontSize',16);
-%hold on;
-%for i = 1:size(mov_x,1)
-    for ii = 1:size(X,1)
-        for ij = 1:size(X,2)                  
-            arrow_annotation = annotation('arrow','headStyle','plain','HeadLength',headLength,'HeadWidth',headWidth);
-            set(arrow_annotation,'parent',gca);
-            set(arrow_annotation,'position',[X(ii,ij)/1000 Y(ii,ij)/1000 LineLength*mov_x(i,ii,ij) LineLength*mov_y(i,ii,ij)]);
-            
-        end
-    end
-%     pause(0.5)
-%     clf
-%     xlim([1 280])
-%     ylim([1 1960])
-%     set(gca, 'DataAspectRatio',[1 4 1]) % set data aspect ratio in zoom box
-%     set(gca, 'PlotBoxAspectRatio',[1 1 1])
-%end
-
-%%
-
-headWidth = 8;
-headLength = 8;
-LineLength = 0.8;
-
-%some data
-[x,y] = meshgrid(0:20:200,0:20:200);
-u = cos(x).*y;
-v = sin(x).*y;
-
-%quiver plots
-figure('Position',[10 10 1000 600],'Color','w');
-hax_1 = subplot(1,2,1);
-hq = quiver(x,y,u,v);           %get the handle of quiver
-title('Regular Quiver plot','FontSize',16);
-
-%get the data from regular quiver
-U = hq.UData;
-V = hq.VData;
-X = hq.XData;
-Y = hq.YData;
-
-%right version (with annotation)
-hax_2 = subplot(1,2,2);
-%hold on;
-for ii = 1:length(X)
-    for ij = 1:length(X)
-
-        headWidth = 5;
-        ah = annotation('arrow',...
-            'headStyle','cback1','HeadLength',headLength,'HeadWidth',headWidth);
-        set(ah,'parent',gca);
-        set(ah,'position',[X(ii,ij) Y(ii,ij) LineLength*U(ii,ij) LineLength*V(ii,ij)]);
-
-    end
-end
-%axis off;
-title('Quiver - annotations ','FontSize',16);
-
-linkaxes([hax_1 hax_2],'xy');
-
-%%
-fig_h = figure();
-
-img = abs(load_img_B_mode(1));
-img_h = imagesc(img);
-ax_h = gca;
-ax_h.YDir = 'normal';
-%ax_h.PlotBoxAspectRatio = [1 1 1]
-ax_h.DataAspectRatio = [250 250 1]
-
-arrow_annotation = annotation('arrow')
-set(arrow_annotation,'parent',gca);
-arrow_annotation.Color = 'r';
-arrow_annotation.Position = [100 100 10 10];
-
-%ax_h.YDir = 'reverse';
-
-
-% %% Interpolate movement
-% interpolate_factor = 11.51;
-% mov_yy = spline(1:size(mov_y,2),mov_y,1:1/interpolate_factor:size(mov_y,2));
-% mov_xx = spline(1:size(mov_x,2),mov_x,1:1/interpolate_factor:size(mov_x,2));
-% 
-% 
-% % Axial displacement list
-% temp = [];
-% for h = 450:510
-%     f_rep = 493;
-%     axial_disp_list = zeros(size(mov_y,1),f_rep,floor(size(mov_yy,2)/f_rep));
-%     
-%     for idx_wind = 1:size(mov_yy,1)
-%         for i = 1:size(axial_disp_list,2)
-%             for k = 1:size(axial_disp_list,3)
-%                 index = size(axial_disp_list,2) * (k-1) + i;
-%                 axial_disp_list(idx_wind,i,k) = mov_yy(idx_wind,index);
-%             end
-%         end
-%     end
-%     
-%     % Remove mean
-%     for idx_wind = 1:size(mov_yy,1)
-%         mean_temp = mean(mean(axial_disp_list(idx_wind,:,:)));
-%         for k = 1:size(axial_disp_list,3)
-%             axial_disp_list(idx_wind,:,k) = axial_disp_list(idx_wind,:,k)-mean(axial_disp_list(idx_wind,:,k));
-%         end
-%     end
-%     
-%     % Axial mean
-%     axial_disp_mean = zeros(size(img_wind_cord,1),size(axial_disp_list,2));
-%     axial_disp_mean = mean(axial_disp_list,3);
-%     
-%     % Axial variance
-%     axial_disp_var = zeros(size(mov_yy,1),1);
-%     for idx_temp = 1:size(mov_y,1)
-%         axial_disp_var(idx_temp) = sum(var(axial_disp_list(idx_temp,:,:),1,3))/size(axial_disp_list,2);
-%     end
-%     %
-%     % Axial std
-%     axial_disp_std = zeros(size(mov_yy,1),1);
-%     axial_disp_std = sqrt(axial_disp_var);
-%     temp(h-449,:) = axial_disp_std ;
-% end
-% [t1 t2] = find(temp == min(temp(:)));
-% 
-% mov_y_mean = spline(linspace(1,f_rep/interpolate_factor,size(axial_disp_mean,2)),axial_disp_mean,1:f_rep/interpolate_factor);
-% 
-% 
-% % Lateral displacement list
-% temp = [];
-% for h = 450:510
-%     f_rep = 493;
-%     lateral_disp_list = zeros(idx_wind,f_rep,floor(size(mov_xx,2)/f_rep));
-%     
-%     for idx_wind = 1:size(mov_yy,1)
-%         for i = 1:size(lateral_disp_list,2)
-%             for k = 1:size(lateral_disp_list,3)
-%                 index = size(lateral_disp_list,2) * (k-1) + i;
-%                 lateral_disp_list(idx_wind,i,k) = mov_xx(idx_wind,index);
-%             end
-%         end
-%     end
-%     
-%     % Remove mean
-%     for idx_wind = 1:size(mov_yy,1)
-%         mean_temp = mean(mean(lateral_disp_list(idx_wind,:,:)));
-%         for k = 1:size(lateral_disp_list,3)
-%             lateral_disp_list(idx_wind,:,k) = lateral_disp_list(idx_wind,:,k)-mean(lateral_disp_list(idx_wind,:,k));
-%         end
-%     end
-%     
-%     % lateral mean
-%     lateral_disp_mean = zeros(size(mov_yy,1),size(lateral_disp_list,2));
-%     lateral_disp_mean = mean(lateral_disp_list,3);
-%     
-%     % lateral variance
-%     lateral_disp_var = zeros(size(mov_yy,1),1);
-%     for idx_temp = 1:size(mov_yy,1)
-%         lateral_disp_var(idx_temp) = sum(var(lateral_disp_list(idx_temp,:,:),1,3))/size(lateral_disp_list,2);
-%     end
-%     %
-%     % lateral std
-%     lateral_disp_std = zeros(size(mov_yy,1),1);
-%     lateral_disp_std = sqrt(lateral_disp_var);
-%     temp(h-449,:) = lateral_disp_std ;
-% end
-% [t3 t4] = find(temp == min(temp(:)));
-% 
-% mov_x_mean = spline(linspace(1,f_rep/interpolate_factor,size(lateral_disp_mean,2)),lateral_disp_mean,1:f_rep/interpolate_factor);
-
-% %% Repeatead mean
-% mov_y_comp = zeros(size(mov_yy,1),size(axial_disp_list,2)*size(axial_disp_list,3));
-% for idx_wind = 1:size(mov_yy,1)
-%     for i = 1:size(axial_disp_list,3)
-%         mov_y_comp(idx_wind,size(axial_disp_list,2)*(i-1)+1:size(axial_disp_list,2)*i) = axial_disp_mean(idx_wind,:); 
-%     end
-% end
-% mov_y_comp = spline(linspace(1,f_rep/interpolate_factor*size(axial_disp_list,3),size(mov_y_comp,2)),mov_y_comp,1:f_rep/interpolate_factor*size(axial_disp_list,3));
-% 
-% mov_x_comp = zeros(size(mov_xx,1),size(lateral_disp_list,2)*size(lateral_disp_list,3));
-% for idx_wind = 1:size(mov_xx,1)
-%     for i = 1:size(lateral_disp_list,3)
-%         mov_x_comp(idx_wind,size(lateral_disp_list,2)*(i-1)+1:size(lateral_disp_list,2)*i) = lateral_disp_mean(idx_wind,:); 
-%     end
-% end
-% mov_x_comp = spline(linspace(1,f_rep/interpolate_factor*size(lateral_disp_list,3),size(mov_x_comp,2)),mov_x_comp,1:f_rep/interpolate_factor*size(lateral_disp_list,3));
-
-% %% Match by correlation 
-% locs = [];
-% pks = [];
-% for idx_wind = 1:size(mov_yy,1)
-%     corr_match = xcorr(mov_y(idx_wind,:),mov_y_mean(idx_wind,:))
-%     figure(); plot(corr_match);
-%     findpeaks(corr_match,'NPeaks',floor(size(mov_y,2)/size(mov_y_mean,2)),'SortStr','descend','MinPeakDistance',10);
-%     % Find peaks
-%     [pks(idx_wind,:),locs(idx_wind,:)] = findpeaks(corr_match,'NPeaks',floor(size(mov_y,2)/size(mov_y_mean,2)),'SortStr','descend','MinPeakDistance',10);
-% end
-% locs = fliplr(locs)
-
-%%
-% % Make compensation array axial
-% mov_y_comp = zeros(size(mov_yy,1),size(mov_y,2));
-% for idx_wind = 1:size(mov_yy,1)
-%     for i = 1:size(locs,2)
-%         mov_y_comp(idx_wind,locs(idx_wind,i)-size(mov_y,2)+1:locs(idx_wind,i)-size(mov_y,2)+size(mov_y_mean,2)) = mov_y_mean(idx_wind,:);
-%     end
-%     if size(mov_y_comp,2) > frames
-%         mov_y_comp(:,frames+1:end) = [];
-%     end
-%     figure();
-%     plot(mov_y_comp(idx_wind,:));
-%     hold on
-%     plot(mov_y(idx_wind,:));
-%     hold off
-%     xlabel('Frames'); ylabel('Axial displacement (mm)');
-% end
-% 
-% % figure();
-% % plot(abs(mov_y_comp(1,:)-mov_y(1,:)));
-% 
-% % Make compensation array lateral
-% mov_x_comp = zeros(size(mov_yy,1),size(mov_x,2));
-% for idx_wind = 1:size(mov_yy,1)
-%     for i = 1:size(locs,2)
-%         mov_x_comp(idx_wind,locs(idx_wind,i)-size(mov_x,2)+1:locs(idx_wind,i)-size(mov_x,2)+size(mov_x_mean,2)) = mov_x_mean(idx_wind,:);
-%     end
-%     if size(mov_x_comp,2) > frames
-%         mov_x_comp(:,frames+1:end) = [];
-%     end
-%     figure();
-%     plot(mov_x_comp(idx_wind,:));
-%     hold on
-%     plot(mov_x(idx_wind,:));
-%     hold off
-% end
-% 
-% % figure();
-% % plot(abs(mov_x_comp(2,:)-mov_x(2,:)));
-% 
-
-%% Displacement multiple axial overlay mean
-  figure();
-for j = 1:5%size(mov_y_comp,1)
-    
-    subplot(5,1,j)
-    
-    hold on
-    
-    for i = 1:size(mov_y_comp_ventilator,3)
-        plot((squeeze(mov_y_comp_ventilator(j+8*3,:,i))));
-    end
-    hold off
-    ylim([-2,8]); %xlim([1 43]);
-%     set(gca,'Xtick',linspace(1,40,5)); set(gca,'XtickLabel',linspace(0,0.8,5));
-%     set(gca,'Ytick',linspace(-2,8,5)); set(gca, 'YTickLabel',linspace(-64,64,5));
-end
-xlabel('Time (s)');
-subplot(5,1,3)
-ylabel('Axial displacement (\mum)');
-subplot(5,1,1)
-title('Axial displacement mean');
-
-%% Displacement multiple lateral overlay mean
-  figure();
-for j = 1:size(mov_x_comp_ventilator,1)
-    
-    subplot(size(mov_x_comp_ventilator,1),1,j)
-    
-    hold on
-    
-    for i = 1:size(mov_x_comp_ventilator,3)
-        plot((squeeze(mov_x_comp_ventilator(j,:,i))));
-    end
-    hold off
-    ylim([-2,1]); %xlim([1 43]);
-    set(gca,'Xtick',linspace(1,40,5)); set(gca,'XtickLabel',linspace(0,0.8,5));
-    set(gca,'Ytick',linspace(-2,1,5)); set(gca, 'YTickLabel',linspace(-64,64,5));
-end
-xlabel('Time (s)');
-subplot(size(mov_x_comp_ventilator,1),1,3)
-ylabel('Lateral displacement (\mum)');
-subplot(size(mov_x_comp_ventilator,1),1,1)
-title('Lateral displacement mean');
-
-
-%%
-%% Displacement multiple axial overlay mean
-  figure();
-for j = 1:5
-    
-    subplot(5,1,j)
-    
-    hold on
-    
-    for i = 1:size(mov_x_comp_ventilator,3)
-        plot((squeeze(mov_x_comp_ventilator(j,:,i))));
-    end
-    hold off
-    %ylim([-2,8]); %xlim([1 43]);
-    %set(gca,'Xtick',linspace(1,40,5)); set(gca,'XtickLabel',linspace(0,0.8,5));
-    %set(gca,'Ytick',linspace(-2,8,5)); set(gca, 'YTickLabel',linspace(-64,64,5));
-end
-
-%% Displacement multiple axial overlay mean
-  figure();
-for j = 1
-    
-%     subplot(5,1,j)
-    
-%     hold on
-    
-    for i = 1:size(mov_y_comp_avg,3)
-        plot((squeeze(mov_y_comp_avg(j,:,i))));
-    end
-    hold off
-    %ylim([-2,8]); %xlim([1 43]);
-    %set(gca,'Xtick',linspace(1,40,5)); set(gca,'XtickLabel',linspace(0,0.8,5));
-    %set(gca,'Ytick',linspace(-2,8,5)); set(gca, 'YTickLabel',linspace(-64,64,5));
-end
-%xlabel('Time (s)');
-%subplot(size(mov_y_copy,1),1,3)
-%ylabel('Axial displacement (\mum)');
-%subplot(size(mov_y_copy,1),1,1)
-%title('Axial displacement mean');

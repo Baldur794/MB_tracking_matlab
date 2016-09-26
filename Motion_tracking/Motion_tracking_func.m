@@ -13,7 +13,6 @@ H.max_mov_x = max_mov_x;
 H.cost_function = 'xCorr';
 H.img_wind_cord = img_wind_cord;
 idx_frame = 1;
-mode = 'b_mode';
              
 %% Displacement             
 mov_y = [];
@@ -23,14 +22,14 @@ mov_x = [];
 for idx_wind = 1:size(img_wind_cord,1)
         % Load ref img
         idx_frame = start_frame;
-        img_ref_wind = H.img_reference_window(idx_frame, idx_wind, mode);
+        img_ref_wind = H.img_reference_window(idx_frame, idx_wind);
         % Repeat for all frames
         for idx_frame = start_frame:start_frame+frames-1;
             %         % Load ref img
-            img_ref_wind = H.img_reference_window(idx_frame, idx_wind, mode);
+            img_ref_wind = H.img_reference_window(idx_frame, idx_wind);
             
             % Load new img
-            img_new_temp = H.img_new_template(idx_frame+1, idx_wind, mode);
+            img_new_temp = H.img_new_template(idx_frame+1, idx_wind);
             
             [motion_y motion_x] = H.motion_displacement(img_ref_wind,img_new_temp);
             mov_y(idx_wind,idx_frame-start_frame+1) = motion_y;

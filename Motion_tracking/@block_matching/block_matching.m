@@ -5,7 +5,7 @@ classdef block_matching
     properties
         max_mov_x = 25;
         max_mov_y = 25;
-        cost_function = 'Norm Corr'
+        cost_function = 'xCorr'
         img_wind_cord =[250,350,125,155];
         n_fore_grnd = 1;
         n_bck_grnd = 0;
@@ -50,37 +50,7 @@ classdef block_matching
                 end
                 [max_y max_x] = peak_estimation(c_mean, 'max');
                 motion_x = max_x(1)-obj.max_mov_x-1;
-                motion_y = max_y(1)-obj.max_mov_y-1;
-%                 for i = 1:size(img_new,2)
-%                     c = [];
-%                     lag = [];
-%                     for j = 1:obj.max_mov_x*2+1
-%                         [c(:,j) lag(:,j)] = crosscorr(img_new(:,i),img_ref(:,j+i-1),obj.max_mov_y*2);
-%                         %                      figure();crosscorr(img_new,img_ref(:,i),obj.max_mov_y*2);
-%                     end
-%                     c = c((size(c,1)-1)/2+1:(size(c,1)-1)/2+1+2*obj.max_mov_y,:);
-%                     [max_y max_x] = peak_estimation(c, 'max');
-%                     motion_x_temp(i) = max_x(1)-obj.max_mov_x-1;
-%                 end
-%                 motion_x = mean(motion_x_temp);
-%                 
-%                 c = [];
-%                 lag = [];
-%                 for i = 1:size(img_new,2)                 
-%                     [c(:,i) lag(:,i)] = crosscorr(img_new(:,i),img_ref(:,obj.max_mov_x+i),obj.max_mov_y*2);
-% %                     figure();crosscorr(img_new,img_ref(:,i),obj.max_mov_y*2);
-%                 end
-%                 c = c((size(c,1)-1)/2+1:(size(c,1)-1)/2+1+2*obj.max_mov_y,:);
-%                 c = mean(c',1)';    
-%                 [max_y max_x] = peak_estimation(c, 'max');
-%                 motion_y = max_y(1)-obj.max_mov_y-1;
-%                
-%                 %----
-% %                 c_axial_mean = mean(c',1);
-% %                 [max_y max_x] = peak_estimation(c_axial_mean', 'max');
-% %                 motion_y = max_y(1)-obj.max_mov_y-1;
-%                 %----
-                
+                motion_y = max_y(1)-obj.max_mov_y-1;     
             else
                 % Cost matrix
                 cost_matrix = zeros(size(img_ref,1)-size(img_new,1)+1,size(img_ref,2)-size(img_new,2)+1);
@@ -110,25 +80,10 @@ classdef block_matching
             end
         end
         
-        function [img_ref_temp] = img_reference_window(varargin)   
-            
-             obj = varargin{1};
-             idx_frame = varargin{2};
-             idx_wind = varargin{3};
-             if size(varargin,2) == 4
-             mode = varargin{4};
-             else
-                 img_avg = varargin{4};
-                 mode = varargin{5};
-             end
-             
+        function [img_ref_temp] = img_reference_window(obj, idx_frame, idx_wind)   
             % Load img
-            if strcmp(mode,'b_mode')
-                img_ref = abs(load_img_B_mode(idx_frame));%---------------------------
-            elseif strcmp(mode,'contrast')
-                img_ref = abs(load_img_contrast(idx_frame,obj.n_fore_grnd,obj.n_fore_grnd,obj.n_bck_grnd_skip));
-                img_ref(img_avg == 0) = 0;
-            end
+            img_ref = abs(load_img_B_mode(idx_frame));%---------------------------
+
             % Find coordinates
             y_start = obj.img_wind_cord(idx_wind,1)-obj.max_mov_y;
             y_end = obj.img_wind_cord(idx_wind,2)+obj.max_mov_y;
@@ -140,25 +95,9 @@ classdef block_matching
             img_ref_temp = img_ref(y_start:y_end,x_start:x_end);
         end
         
-        function [img_new_temp] = img_new_template(varargin)
-            obj = varargin{1};
-            idx_frame = varargin{2};
-            idx_wind = varargin{3};
-            if size(varargin,2) == 4
-                mode = varargin{4};
-            else
-                img_avg = varargin{4};
-                mode = varargin{5};
-            end
-            
+        function [img_new_temp] = img_new_template(obj, idx_frame, idx_wind)
             % Load new img
-            if strcmp(mode,'b_mode')
-                img_new = abs(load_img_B_mode(idx_frame));%-------------------
-            elseif strcmp(mode,'contrast')
-                img_new = abs(load_img_contrast(idx_frame,obj.n_fore_grnd,obj.n_fore_grnd,obj.n_bck_grnd_skip));
-                img_new(img_avg == 0) = 0;
-                %abs(load_img_contrast(idx_frame,obj.n_fore_grnd,obj.n_fore_grnd,obj.n_bck_grnd_skip));
-            end
+            img_new = abs(load_img_B_mode(idx_frame));
             
             % Find coordinates
             y_start = obj.img_wind_cord(idx_wind,1);

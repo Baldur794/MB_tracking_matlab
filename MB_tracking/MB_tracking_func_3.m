@@ -1,5 +1,5 @@
 function out = In_vivo_Contrast_processing_func( idx_frame_start, index )
-%
+% Dataset 2016_04_21_15_08_04
 MB_window_coord_search = zeros(2,2); % Coordinates for search window
 MB_window_coord_search_clear = zeros(2,2); % Coordinates for search clear window
 
@@ -14,7 +14,7 @@ MB_window_threshold = 1.3; % Window Threshold (actual MB_window_threshold = Max_
 MB_window_out_of_bounce = 0; % Checks if search windows is outside image
 
 n_bck = 50; 
-v_MB = 0.5*10^(-3);
+v_MB = 0.2*10^(-3);
 nframe = 1000;
 idx_frame_start = idx_frame_start;%4550;%3970;
 idx_comp_sync = 900;
@@ -32,6 +32,10 @@ MB.new_pos = zeros(1,2);
 MB.vel = zeros(1,2); 
 MB.max_int = 0;
 MB.centroid = zeros(1,2);
+MB.area = 0;
+MB.eccentricity = 0;
+MB.orientation = 0;
+MB.perimeter = 0;
 MB.id = 0;
 MB.count = 0;
 MB_log = MB;
@@ -40,7 +44,7 @@ tic
 for idx_frame=idx_frame_start:idx_frame_start+nframe
     idx_frame
     % Load img
-    img = load_img_contrast_2(idx_frame,idx_comp_sync,n_bck,v_MB,mov_x_comp_contrast,mov_y_comp_contrast);
+    img = load_img_contrast_3(idx_frame,idx_comp_sync,n_bck,v_MB,mov_x_comp_contrast,mov_y_comp_contrast);
 
     % Calculate threshold
     SEM = std(img(:));
@@ -246,12 +250,19 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
                 % Features: MaxIntensity, MeanIntensity, WeigtedCentroid
                 MB_blob_features = regionprops(img_blob_label_window, img_temp_window,'MaxIntensity','WeightedCentroid');
                 
+                % Features: Area, Eccentricity, Orientation, Perimeter
+                MB_blob_features_bw = regionprops(img_blob_label_window,'Area','Eccentricity','Orientation','Perimeter');     
+                
                 % Updata MB
                 MB(MB_index).old_pos = MB(MB_index).new_pos;
                 MB(MB_index).new_pos = fliplr(round(MB_blob_features.WeightedCentroid)) + [MB_window_coord_search(1,1)-1, MB_window_coord_search(1,2)-1];%[max_y,max_x];
                 MB(MB_index).vel = MB(MB_index).new_pos-MB(MB_index).old_pos;
                 MB(MB_index).max_int = max_int;
                 MB(MB_index).centroid = fliplr(round(MB_blob_features.WeightedCentroid)) + [MB_window_coord_search(1,1)-1, MB_window_coord_search(1,2)-1];
+                MB(MB_index).area = MB_blob_features_bw.Area;
+                MB(MB_index).eccentricity = MB_blob_features_bw.Eccentricity;
+                MB(MB_index).orientation = MB_blob_features_bw.Orientation;
+                MB(MB_index).perimeter = MB_blob_features_bw.Perimeter;
                 MB(MB_index).count = [blob_count_global_window blob_count_window];
                 MB(MB_index).age = MB(MB_index).age + [0 1 1];
 
@@ -261,6 +272,10 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
                 MB_log(MB_index).vel(MB(MB_index).age(3),:) = MB(MB_index).vel;
                 MB_log(MB_index).max_int(MB(MB_index).age(3)) = MB(MB_index).max_int;
                 MB_log(MB_index).centroid(MB(MB_index).age(3),:) = MB(MB_index).centroid;
+                MB_log(MB_index).area(MB(MB_index).age(3)) = MB(MB_index).area;
+                MB_log(MB_index).eccentricity(MB(MB_index).age(3)) = MB(MB_index).eccentricity;
+                MB_log(MB_index).orientation(MB(MB_index).age(3)) = MB(MB_index).orientation;
+                MB_log(MB_index).perimeter(MB(MB_index).age(3)) = MB(MB_index).perimeter;
                 MB_log(MB_index).count(MB(MB_index).age(3),:) = MB(MB_index).count;
                 MB_log(MB_index).age = MB(MB_index).age;
             else
@@ -379,7 +394,10 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
             
             % Features: MaxIntensity, MeanIntensity, WeigtedCentroid
             MB_blob_features = regionprops(img_blob_label_window, img_temp_window,'MaxIntensity','WeightedCentroid');
-           
+            
+            % Features: Area, Eccentricity, Orientation, Perimeter
+            MB_blob_features_bw = regionprops(img_blob_label_window,'Area','Eccentricity','Orientation','Perimeter');
+            
             % Updata MB
             MB(MB_index).state = 1;
             MB(MB_index).old_pos = [0, 0];
@@ -388,6 +406,10 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
             MB(MB_index).id = MB_index;
             MB(MB_index).max_int = max_int;
             MB(MB_index).centroid = fliplr(round(MB_blob_features.WeightedCentroid)) + [MB_window_coord_search(1,1)-1, MB_window_coord_search(1,2)-1];
+            MB(MB_index).area = MB_blob_features_bw.Area;
+            MB(MB_index).eccentricity = MB_blob_features_bw.Eccentricity;
+            MB(MB_index).orientation = MB_blob_features_bw.Orientation;
+            MB(MB_index).perimeter = MB_blob_features_bw.Perimeter;
             MB(MB_index).count = [blob_count_global_window blob_count_window];
             MB(MB_index).age = [idx_frame idx_frame 1];
 
@@ -399,6 +421,10 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
             MB_log(MB_index).id = MB_index;
             MB_log(MB_index).max_int = MB(MB_index).max_int;
             MB_log(MB_index).centroid = MB(MB_index).centroid;
+            MB_log(MB_index).area = MB(MB_index).area;
+            MB_log(MB_index).eccentricity = MB(MB_index).eccentricity;
+            MB_log(MB_index).orientation = MB(MB_index).orientation;
+            MB_log(MB_index).perimeter = MB(MB_index).perimeter;
             MB_log(MB_index).count = MB(MB_index).count;
             MB_log(MB_index).age = MB(MB_index).age;
         end
