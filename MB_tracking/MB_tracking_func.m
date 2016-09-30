@@ -51,7 +51,6 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
     ts = tinv(0.9999,length(img(:))-1);     
     CI = mean(img(:)) + ts*SEM;
     global_threshold = CI;
-%     global_threshold = 20;
     
     % Threshold
     img_global_threshold = img;
@@ -121,44 +120,7 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
 %         figure(); imagesc(img_global_threshold); colormap('gray');%--- 
         
          % Check if any blobs are within window
-        if any(img_temp_window(:))
-            
-%             % Update window coordinates
-%             if MB(MB_index).age(3) == 1
-%                 MB_window_coord_search(1,1) = MB(MB_index).new_pos(1)-MB_window_size_search_localization(1);
-%                 MB_window_coord_search(2,1) = MB(MB_index).new_pos(1)+MB_window_size_search_localization(1);
-%                 MB_window_coord_search(1,2) = MB(MB_index).new_pos(2)-MB_window_size_search_localization(2);
-%                 MB_window_coord_search(2,2) = MB(MB_index).new_pos(2)+MB_window_size_search_localization(2);      
-%             else
-%                 MB_window_coord_search(1,1) = MB(MB_index).new_pos(1)-MB_window_size_search_localization(1);%+MB(MB_index).vel(1);
-%                 MB_window_coord_search(2,1) = MB(MB_index).new_pos(1)+MB_window_size_search_localization(1);%+MB(MB_index).vel(1);
-%                 MB_window_coord_search(1,2) = MB(MB_index).new_pos(2)-MB_window_size_search_localization(2);%+MB(MB_index).vel(2);
-%                 MB_window_coord_search(2,2) = MB(MB_index).new_pos(2)+MB_window_size_search_localization(2);%+MB(MB_index).vel(2); 
-%             end
-%             
-%             % Check for out of bounce
-%             % y_start
-%             MB_window_out_of_bounce = 0;
-%             if MB_window_coord_search(1,1) <= 0
-%                 MB_window_coord_search(1,1) = 1;               
-%                 MB_window_out_of_bounce = 1;
-%             end
-%             % y_end
-%             if MB_window_coord_search(2,1) > size(img,1)
-%                 MB_window_coord_search(2,1) = size(img,1);
-%                 MB_window_out_of_bounce = 1;
-%             end
-%             % x_start
-%             if MB_window_coord_search(1,2) <= 0
-%                 MB_window_coord_search(1,2) = 1;
-%                 MB_window_out_of_bounce = 1;
-%             end
-%             % x_end
-%             if MB_window_coord_search(2,2) > size(img,2)
-%                 MB_window_coord_search(2,2) = size(img,2);
-%                 MB_window_out_of_bounce = 1;
-%             end
-                      
+        if any(img_temp_window(:))                  
             % Create temp window
             img_temp_window = img(MB_window_coord_search(1,1):MB_window_coord_search(2,1),MB_window_coord_search(1,2):MB_window_coord_search(2,2));
 %             figure(); imagesc(img_temp_window); colormap('gray');%---

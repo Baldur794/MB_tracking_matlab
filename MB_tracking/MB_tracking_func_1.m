@@ -15,7 +15,7 @@ MB_window_out_of_bounce = 0; % Checks if search windows is outside image
 
 n_bck = 50; 
 v_MB = 0.2*10^(-3);
-nframe = 1000;
+nframe = 10;
 idx_frame_start = idx_frame_start;%4550;%3970;
 idx_comp_sync = 900;
 interpolation_type = 'spline';

@@ -1,13 +1,15 @@
 %% Calculate movement
 % vel_x = mov_x;%----
 % vel_y = mov_y;%----
+
+% removes mean value -> assume same start and end position
 vel_x = vel_x_raw-repmat(mean(vel_x_raw')',1,size(vel_x_raw,2));
 vel_y = vel_y_raw-repmat(mean(vel_y_raw')',1,size(vel_y_raw,2));
+
+% Only for displaying movement compared to ref first image
 mov_y = zeros(size(vel_y));
 mov_x = zeros(size(vel_x));
 
-
-% Only for displaying movement compared to ref first image
 for idx_wind = 1:size(vel_y,1)
     for idx_frame = start_frame:start_frame+size(mov_y,2)-1;
         mov_y(idx_wind,idx_frame-start_frame+1) = sum(vel_y(idx_wind,1:idx_frame-start_frame+1));
@@ -23,11 +25,10 @@ end
 n = 20;
 b_l = fir1(n,0.05,'low');
 
-
 vel_y_ventilator = filter(b_l,1,vel_y,[],2)*1.22; %1.22 = damping factor from filter
-vel_y_ventilator = vel_y_ventilator(:,n/2:end);
+vel_y_ventilator = vel_y_ventilator(:,n/2:end); % adjust for filter delay
 vel_x_ventilator = filter(b_l,1,vel_x,[],2)*1.22; %1.22 = damping factor from filter
-vel_x_ventilator = vel_x_ventilator(:,n/2:end);
+vel_x_ventilator = vel_x_ventilator(:,n/2:end); % adjust for filter delay
 
 % figure();plot(abs(fft(vel_y_ventilator(idx_contrast,:)-mean(vel_y_ventilator(idx_contrast,:)))));
 % figure();plot(abs(fft(vel_x_ventilator(idx_contrast,:)-mean(vel_x_ventilator(idx_contrast,:)))));
@@ -39,9 +40,9 @@ b_h = fir2(n,[0 0.1 0.15 0.3 0.35 1] ,[0 0 1 1 0 0]);
 % b_h = fir1(n,0.05,'high');
 
 
-vel_y_pulse = filter(b_h,1,vel_y,[],2)*1.2; %1.22 = damping factor from filter
+vel_y_pulse = filter(b_h,1,vel_y,[],2)*1.2; %1.2 = damping factor from filter
 vel_y_pulse = vel_y_pulse(:,n/2:end);
-vel_x_pulse = filter(b_h,1,vel_x,[],2)*1.2; %1.22 = damping factor from filter
+vel_x_pulse = filter(b_h,1,vel_x,[],2)*1.2; %1.2 = damping factor from filter
 vel_x_pulse = vel_x_pulse(:,n/2:end);
 
 % figure();plot(abs(fft(vel_y_pulse(idx_contrast,:)-mean(vel_y_pulse(idx_contrast,:)))));
@@ -49,17 +50,18 @@ vel_x_pulse = vel_x_pulse(:,n/2:end);
 
 
 %% Interpolate velocity ventilator
-interpolate_factor = 10;
-f_rep_ventilator = 430;
-rep_factor_ventilator = 3%;1000;
+interpolate_factor = 10; % interpolation factor
+f_rep_ventilator = 430; % number of indexes for a single ventilator cycle
+rep_factor_ventilator = 3%;1000; % number of cycles in final compensation array -> make sure larger than tracking frames
 vel_yy = spline(1:size(vel_y_ventilator,2),vel_y_ventilator,1:1/interpolate_factor:size(vel_y_ventilator,2));
 vel_xx = spline(1:size(vel_x_ventilator,2),vel_x_ventilator,1:1/interpolate_factor:size(vel_x_ventilator,2));
 
-min_variance = 1000;
-% for f_rep = 400:450
+% min_variance = 1000;
+% for f_rep = 400:450 % search for minimum variance -> best f_rep_ventilator value 
     % Axial velocity list
     axial_vel_list = zeros(size(vel_y_ventilator,1),f_rep_ventilator,floor(size(vel_yy,2)/f_rep_ventilator));
 
+    % Make list of single cycles
     for idx_wind = 1:size(vel_yy,1)
         for i = 1:size(axial_vel_list,2)
             for k = 1:size(axial_vel_list,3)
@@ -69,23 +71,14 @@ min_variance = 1000;
         end
     end
 
-    % Remove mean
+    % Remove mean from each cycle
     for idx_wind = 1:size(vel_yy,1)
         for k = 1:size(axial_vel_list,3)
             axial_vel_list(idx_wind,:,k) = axial_vel_list(idx_wind,:,k)-mean(axial_vel_list(idx_wind,:,k));
         end
     end
 
-    % Recreated velocity list
-    vel_yy_zero_mean = zeros(size(vel_yy));
-    for idx_wind = 1:size(vel_yy,1)
-        for k = 1:size(axial_vel_list,3)
-            vel_yy_zero_mean(idx_wind,size(axial_vel_list,2)*(k-1)+1:size(axial_vel_list,2)*k) = axial_vel_list(idx_wind,:,k);
-        end
-    end
-
     % Axial mean
-    axial_vel_mean = zeros(size(vel_yy,1),size(axial_vel_list,2));
     axial_vel_mean = mean(axial_vel_list,3);
 
     % Axial variance
@@ -100,13 +93,12 @@ min_variance = 1000;
 %     end
 % end
 %
+
 % Axial std
-axial_vel_std = zeros(size(vel_yy,1),1);
 axial_vel_std = sqrt(axial_vel_var);
 
 axial_vel_mean = repmat(axial_vel_mean,1,rep_factor_ventilator);
 
-% vel_y_mean = spline(linspace(1,f_rep/interpolate_factor,size(axial_vel_mean,2)),axial_vel_mean,1:f_rep/interpolate_factor);
 vel_y_mean_ventilator = spline(linspace(1,f_rep_ventilator/interpolate_factor*rep_factor_ventilator,size(axial_vel_mean,2)),axial_vel_mean,1:f_rep_ventilator/interpolate_factor*rep_factor_ventilator);
 
 
@@ -129,16 +121,7 @@ for idx_wind = 1:size(vel_yy,1)
     end
 end
 
-% Recreated velocity list
-vel_xx_zero_mean = zeros(size(vel_xx));
-for idx_wind = 1:size(vel_xx,1)
-    for k = 1:size(axial_vel_list,3)
-        vel_xx_zero_mean(idx_wind,size(axial_vel_list,2)*(k-1)+1:size(axial_vel_list,2)*k) = axial_vel_list(idx_wind,:,k);
-    end
-end
-
 % lateral mean
-lateral_vel_mean = zeros(size(vel_xx,1),size(lateral_vel_list,2));
 lateral_vel_mean = mean(lateral_vel_list,3);
 
 % lateral variance
@@ -148,12 +131,10 @@ for idx_temp = 1:size(vel_xx,1)
 end
 %
 % lateral std
-lateral_vel_std = zeros(size(vel_xx,1),1);
 lateral_vel_std = sqrt(lateral_vel_var);
 
 lateral_vel_mean = repmat(lateral_vel_mean,1,rep_factor_ventilator);
 
-% vel_x_mean = spline(linspace(1,f_rep/interpolate_factor,size(lateral_vel_mean,2)),lateral_vel_mean,1:f_rep/interpolate_factor);
 vel_x_mean_ventilator = spline(linspace(1,f_rep_ventilator/interpolate_factor*rep_factor_ventilator,size(lateral_vel_mean,2)),lateral_vel_mean,1:f_rep_ventilator/interpolate_factor*rep_factor_ventilator);
 
 
@@ -185,16 +166,7 @@ vel_xx = spline(1:size(vel_x_pulse,2),vel_x_pulse,1:1/interpolate_factor:size(ve
         end
     end
 
-    % Recreated velocity list
-    vel_yy_zero_mean = zeros(size(vel_yy));
-    for idx_wind = 1:size(vel_yy,1)
-        for k = 1:size(axial_vel_list,3)
-            vel_yy_zero_mean(idx_wind,size(axial_vel_list,2)*(k-1)+1:size(axial_vel_list,2)*k) = axial_vel_list(idx_wind,:,k);
-        end
-    end
-
     % Axial mean
-    axial_vel_mean = zeros(size(vel_yy,1),size(axial_vel_list,2));
     axial_vel_mean = mean(axial_vel_list,3);
 
     % Axial variance
@@ -210,12 +182,10 @@ vel_xx = spline(1:size(vel_x_pulse,2),vel_x_pulse,1:1/interpolate_factor:size(ve
 % end
 %
 % Axial std
-axial_vel_std = zeros(size(vel_yy,1),1);
 axial_vel_std = sqrt(axial_vel_var);
 
 axial_vel_mean = repmat(axial_vel_mean,1,rep_factor_pulse);
 
-% vel_y_mean = spline(linspace(1,f_rep/interpolate_factor,size(axial_vel_mean,2)),axial_vel_mean,1:f_rep/interpolate_factor);
 vel_y_mean_pulse = spline(linspace(1,f_rep_pulse/interpolate_factor*rep_factor_pulse,size(axial_vel_mean,2)),axial_vel_mean,1:f_rep_pulse/interpolate_factor*rep_factor_pulse);
 
 
@@ -238,17 +208,7 @@ for idx_wind = 1:size(vel_yy,1)
     end
 end
 
-% Recreated velocity list
-vel_xx_zero_mean = zeros(size(vel_xx));
-for idx_wind = 1:size(vel_xx,1)
-    for k = 1:size(axial_vel_list,3)
-        vel_xx_zero_mean(idx_wind,size(axial_vel_list,2)*(k-1)+1:size(axial_vel_list,2)*k) = axial_vel_list(idx_wind,:,k);
-    end
-end
-
-
 % lateral mean
-lateral_vel_mean = zeros(size(vel_xx,1),size(lateral_vel_list,2));
 lateral_vel_mean = mean(lateral_vel_list,3);
 
 % lateral variance
@@ -258,12 +218,10 @@ for idx_temp = 1:size(vel_xx,1)
 end
 %
 % lateral std
-lateral_vel_std = zeros(size(vel_xx,1),1);
 lateral_vel_std = sqrt(lateral_vel_var);
 
 lateral_vel_mean = repmat(lateral_vel_mean,1,rep_factor_pulse);
 
-% vel_x_mean = spline(linspace(1,f_rep/interpolate_factor,size(lateral_vel_mean,2)),lateral_vel_mean,1:f_rep/interpolate_factor);
 vel_x_mean_pulse = spline(linspace(1,f_rep_pulse/interpolate_factor*rep_factor_pulse,size(lateral_vel_mean,2)),lateral_vel_mean,1:f_rep_pulse/interpolate_factor*rep_factor_pulse);
 
 
@@ -395,120 +353,6 @@ ylim([-5,70]);% xlim([0,40]);
 %set(gca,'Xtick',linspace(0,100,20)); set(gca,'Xtick',linspace(0,img_size(2),4));
 %set(gca,'Ytick',linspace(17,32,5)); set(gca, 'YTickLabel',linspace(-0.2,0.2,5));
 
-%% Velocity axial
-figure(); plot((vel_y + flipud(repmat(linspace(0,50,size(vel_y,1))',1,size(vel_y,2))))');% legend('1','2','3','4','5','6','7');
-xlabel('frames (50 fps)'); ylabel('Axial Velocity (mm)'); 
-title('Axial Velocity');
-ylim([-5,70]);% xlim([0,40]);
-%set(gca,'Xtick',linspace(0,100,20)); set(gca,'Xtick',linspace(0,img_size(2),4));
-%set(gca,'Ytick',linspace(17,32,5)); set(gca, 'YTickLabel',linspace(-0.2,0.2,5));
-
-%% Axial displacement interpolate
-figure(); plot((mov_yy + flipud(repmat(linspace(0,40,size(mov_y,1))',1,size(mov_yy,2))))'); legend('1','2','3','4','5','6','7');
-%xlabel('frames (50 fps)'); ylabel('Axial displacement (mm)'); 
-title('Axial displacement interpolated');
-%ylim([-5,45]);% xlim([0,3000]);
-%set(gca,'Xtick',linspace(0,100,20)); set(gca,'Xtick',linspace(0,img_size(2),4));
-%set(gca,'Ytick',linspace(65.5,95.5,5)); set(gca, 'YTickLabel',linspace(-0.25,0.25,5));
-
-%% Displacement axial mean
-figure(); plot((axial_disp_mean)'); legend('1','2','3','4','5','6','7'); 
-%xlabel('time (ms)'); ylabel('Axial displacement (mm)');
-title('Axial displacement mean');
-%ylim([-20,20]);
-%set(gca,'Xtick',linspace(0,45,10)); set(gca,'XtickLabel',linspace(0,0.9,10));
-%set(gca,'Ytick',linspace(-20,5,5)); set(gca, 'YTickLabel',linspace(-0.16,0.16,5));
-
-%% Displacement multiple axial overlay
-for j = 1:size(axial_disp_list,1)
-    figure(108);
-    
-    subplot(size(axial_disp_list,1),1,j)
-    
-    hold on
-    
-    for i = 1:size(axial_disp_list,3)
-        plot((squeeze(axial_disp_list(j,:,i))));
-    end
-    hold off
-    %legend('1','2','3','4','5','6','7');
-    xlabel('Frames'); ylabel('Axial displacement (mm)');
-    title('Axial displacement');
-    %ylim([-5,5]); %xlim([1 43]);
-    %set(gca,'Xtick',linspace(0,37,6)); set(gca,'XtickLabel',linspace(0,20,6));
-    %set(gca,'Ytick',linspace(-3,12,5)); set(gca, 'YTickLabel',linspace(0,0.2,5));
-end
-
-%% Displacement lateral
-figure(); plot((mov_x + flipud(repmat(linspace(0,40,size(mov_x,1))',1,size(mov_x,2))))'); legend('1','2','3','4','5','6','7'); 
-xlabel('frames (50 fps)'); ylabel('Lateral displacement (mm)');
-title('Lateral displacement');
-ylim([-5,55]);% xlim([0,300]);
-%set(gca,'Xtick',linspace(0,img_size(2),4)); set(gca,'Xtick',linspace(0,img_size(2),4));
-%set(gca,'Ytick',linspace(14,26,5)); set(gca, 'YTickLabel',linspace(-0.25,0.25,5));
-
-%% Velocity lateral
-figure(); plot((vel_x + flipud(repmat(linspace(0,40,size(vel_x,1))',1,size(vel_x,2))))'); legend('1','2','3','4','5','6','7'); 
-xlabel('frames (50 fps)'); ylabel('Lateral velocity (mm)');
-title('Lateral velocity');
-ylim([-5,55]);% xlim([0,300]);
-%set(gca,'Xtick',linspace(0,img_size(2),4)); set(gca,'Xtick',linspace(0,img_size(2),4));
-%set(gca,'Ytick',linspace(14,26,5)); set(gca, 'YTickLabel',linspace(-0.25,0.25,5));
-
-%% Lateral displacement interpolate
-figure(); plot((mov_xx + flipud(repmat(linspace(0,40,size(mov_x,1))',1,size(mov_xx,2))))'); legend('1','2','3','4','5','6','7');
-%xlabel('frames (50 fps)'); ylabel('Axial displacement (mm)'); 
-title('Lateral displacement interpolated');
-ylim([-5,45]);% xlim([0,3000]);
-%set(gca,'Xtick',linspace(0,100,20)); set(gca,'Xtick',linspace(0,img_size(2),4));
-%set(gca,'Ytick',linspace(65.5,95.5,5)); set(gca, 'YTickLabel',linspace(-0.25,0.25,5));
-
-
-%% Displacement lateral mean
-figure(6); plot((lateral_disp_mean)'); legend('1','2','3','4','5','6','7');
-%xlabel('time (ms)'); ylabel('Lateral displacement (mm)'); 
-title('Lateral displacement mean');
-ylim([-2.3,2.3]);
-%set(gca,'Xtick',linspace(0,45,10)); set(gca,'XtickLabel',linspace(0,0.9,10));
-%set(gca,'Ytick',linspace(-2.3,2.3,5)); set(gca, 'YTickLabel',linspace(-0.1,0.1,5));
-
-%% Displacement multiple lateral overlay
-for j = 1:size(axial_disp_list,1)
-    figure(107);
-    
-    subplot(size(axial_disp_list,1),1,j)
-    
-    hold on
-    for i = 1:size(lateral_disp_list,3)
-        plot((squeeze(lateral_disp_list(1,:,i))));
-    end
-    hold off
-    %legend('1','2','3','4','5','6','7');
-    xlabel('Frames'); ylabel('Lateral displacement (mm)');
-    title('Lateral displacement');
-    %ylim([-2,2]); %xlim([1 43]);
-    %set(gca,'Xtick',linspace(0,37,6)); set(gca,'XtickLabel',linspace(0,20,6));
-    %set(gca,'Ytick',linspace(-1.25,1.25,5)); set(gca, 'YTickLabel',linspace(0,0.1,5));
-end
-%% Frequency spectrum from axial displacement
-figure(); plot(linspace(0,fps/2,frames/2),abs(mov_y_frq(:,1:frames/2))'); legend('1','2','3','4','5','6','7');  xlabel('Frequency (Hz)'); ylabel('Magnitude'); % title('Frequency spectrum of axial displacement');
-%set(gca,'Xtick',linspace(0,26,25)); set(gca,'Xtick',linspace(0,25,26));
-%set(gca,'Ytick',linspace(0,9,10)); set(gca, 'YTickLabel',linspace(0,1,2));
-
-%% Frequency spectrum from axial mean displacement
-figure(11); plot(linspace(0,fps/2,size(axial_disp_mean_rep,2)/2),abs(axial_disp_mean_frq(:,1:size(axial_disp_mean_rep,2)/2))'); legend('1','2','3','4','5','6','7');  xlabel('Frequency (Hz)'); ylabel('Magnitude'); % title('Frequency spectrum of mean axial displacement');
-%set(gca,'Xtick',linspace(0,26,25)); set(gca,'Xtick',linspace(0,25,26));
-%set(gca,'Ytick',linspace(0,9,10)); set(gca, 'YTickLabel',linspace(0,1,2));
-
-%% Frequency spectrum from lateral displacement
-figure(); plot(linspace(0,fps/2,frames/2),abs(mov_x_frq(:,1:frames/2))'); legend('1','2','3','4','5','6','7'); xlabel('Frequency (Hz)'); ylabel('Magnitude'); %title('Frequency spectrum of lateral displacement');
-%set(gca,'Xtick',linspace(0,26,25)); set(gca,'Xtick',linspace(0,25,26));
-%set(gca,'Ytick',linspace(0,9,10)); set(gca, 'YTickLabel',linspace(0,1,2));
-
-%% Frequency spectrum from axial mean displacement
-figure(13); plot(linspace(0,fps/2,size(lateral_disp_mean_rep,2)/2),abs(lateral_disp_mean_frq(7,1:size(lateral_disp_mean_rep,2)/2))'); legend('1','2','3','4','5','6','7');  xlabel('Frequency (Hz)'); ylabel('Magnitude'); % title('Frequency spectrum of mean lateral displacement');
-%set(gca,'Xtick',linspace(0,26,25)); set(gca,'Xtick',linspace(0,25,26));
-%set(gca,'Ytick',linspace(0,9,10)); set(gca, 'YTickLabel',linspace(0,1,2));
 
 %% Video 
 img = abs(load_img_B_mode(1));
