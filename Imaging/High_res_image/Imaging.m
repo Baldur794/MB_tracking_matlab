@@ -1,334 +1,221 @@
-%% Age and Density filter
-MB_index_filter_frame = [];
-MB_index_filter_age = [];
-MB_index_filter_count = [];
-MB_index_filter_stuck_vel = []; % Filtered list of MB's satisfying conditions
-MB_index_filter_stuck_int = [];
-MB_index_filter_avg = []; % Filtered list of MB's satisfying conditions
-MB_index_filter_dir = []; % Filtered list of MB's satisfying conditions
+%% Axes for plots
 
-MB_index_list = []; % List of indexes with for found MB's
-MB_vel_list = []; % List with all velocity vectors
-temp = [];
-MB_log_copy = MB_log;
-MB_index_init = 1:size(MB_log_copy,2);
-% 
-% MB_log_copy = [];
-% MB_log_copy = MB_plot(1);
-% MB_log_copy(2) = MB_plot(3);
-% MB_index_init = 1:size(MB_log_copy,2);
+% Get img size
+img_size = size(load_img(1, img_type, folderName, img_resolution, area_of_interest)); % [y,x]
 
-% check age condition
-if MB_frame_condition_min ~= 0; 
-    for i = 1:size(MB_index_init,2)
-        MB_index = MB_index_init(i);
-        if (MB_log_copy(MB_index).age(1) >= MB_frame_condition_min) && (MB_log_copy(MB_index).age(2) <= MB_frame_condition_max)
-            MB_index_filter_frame = [MB_index_filter_frame, MB_index];
+% Propagation speed of sound
+c = 1540;
+
+% Create axes
+t_axis = linspace(area_of_interest.axial_init*(1/sampling_rate),area_of_interest.axial_end*(1/sampling_rate),img_size(1));
+depth_axis = (t_axis*c)/2;   %  Values always in MKS :end_line)
+lateral_axis = linspace((area_of_interest.lateral_init-1)*element_pitch/line_density,(area_of_interest.lateral_end-1)*element_pitch/line_density,img_size(2));
+% lateral_axis = linspace((area_of_interest.lateral_init-floor((area_of_interest.lateral_end-(area_of_interest.lateral_init-1))/2))*element_pitch/line_density,(area_of_interest.lateral_end-floor((area_of_interest.lateral_end-(area_of_interest.lateral_init-1))/2))*element_pitch/line_density,img_size_lateral);
+
+% Frame rate
+fps = 163;
+
+
+%%
+MB_log_copy = MB_log; % Copy of MB_log
+MB_index_list = 1:size(MB_log_copy,2); % List of indexes for valid MBs
+
+% Setup conditions
+% Use only MBs found within min and max frame number condition
+MB_frameNumber_min_condition_flag = false;
+MB_frameNumber_min_condition = 550;
+MB_frameNumber_max_condition = 590;
+MB_index_min_max_frameNumber = [];
+
+% Use only MBs with an age between min and max age condition
+MB_age_min_max_condition_flag = true;
+MB_age_min_condition = 6;
+MB_age_max_condition = 3000;
+MB_index_min_max_age = [];
+
+% Use only MBs with a blob count below max condition
+MB_max_blob_count_condition_flag = false;
+MB_max_blob_count_condition = 20; 
+MB_index_max_blob_count = [];
+
+% Use only MBs with an avg velocity above min condition
+MB_min_avg_vel_condition_flag = true;
+MB_min_avg_vel_condition = 1;
+MB_index_min_avg_vel = []; 
+
+% Use only MBs located around other MBs with conditions about distance and avg density.
+MB_min_avg_density_condition_flag = false;
+MB_min_avg_density_condition = 0.5; 
+MB_window_size_density_avg = [5 5]; % Window for density condition
+MB_index_min_avg_density = []; 
+
+% Use only MBs for determine inflow/outflow. 0 = not used
+inflow_outflow_center_coord_condition_flag = false;
+inflow_outflow_const = 1; % Towards center coord set 1. Away set -1.
+inflow_outflow_center_coord_condition = [0 0]; % [y,x]
+MB_index_inflow_outflow = []; % Filtered list of MBs satisfying conditions
+
+% Smooth velocity/direction for each MB
+smooth_vel_dir_flag = true;
+smooth_vel_dir_length = 50; % Number of MBs used for smoothing
+
+%
+% Check frame condition
+if MB_frameNumber_min_condition_flag; 
+    for i = 1:size(MB_index_list,2)
+        MB_index = MB_index_list(i);
+        % Check condition
+        if (MB_log_copy(MB_index).age(1) < MB_frameNumber_min_condition) || (MB_log_copy(MB_index).age(2) > MB_frameNumber_max_condition)
+            MB_index_list(i) = 0;
         end
     end
-else
-    MB_index_filter_frame = MB_index_init;
+    MB_index_list(MB_index_list == 0) = [];
+    MB_index_min_max_frameNumber = MB_index_list;
 end
 
-% check age condition
-for i = 1:size(MB_index_filter_frame,2)
-    MB_index = MB_index_filter_frame(i);
-   if (MB_log_copy(MB_index).age(3) >= MB_age_condition_min) && (MB_log_copy(MB_index).age(3) <= MB_age_condition_max)
-    MB_index_filter_age = [MB_index_filter_age, MB_index];
-   end
+
+% Check age condition
+if MB_age_min_max_condition_flag;
+    for i = 1:size(MB_index_list,2)
+        MB_index = MB_index_list(i);
+        % Check condition
+        if (MB_log_copy(MB_index).age(3) < MB_age_min_condition) || (MB_log_copy(MB_index).age(3) > MB_age_max_condition)
+            MB_index_list(i) = 0;
+        end
+    end
+    MB_index_list(MB_index_list == 0) = [];
+    MB_index_min_max_age = MB_index_list;
 end
 
-% check count condition
-for i = 1:size(MB_index_filter_age,2)
-    MB_index = MB_index_filter_age(i);
-   if (max(MB_log_copy(MB_index).count(:)) <= MB_count_condition)
-    MB_index_filter_count = [MB_index_filter_count, MB_index];
-   end
+
+% Check max blob count condition
+if MB_max_blob_count_condition_flag;
+    for i = 1:size(MB_index_list,2)
+        MB_index = MB_index_list(i);
+        % Check condition
+        if (max(MB_log_copy(MB_index).count(:)) > MB_max_blob_count_condition)
+            MB_index_list(i) = 0;
+        end
+    end
+    MB_index_list(MB_index_list == 0) = [];
+    MB_index_max_blob_count = MB_index_list;
 end
 
-%------ 
-%Remove stuck MB's from average speed
-if MB_avg_vel_condition ~= 0
-    for i = 1:size(MB_index_filter_count,2)
-        MB_index = MB_index_filter_count(i);
+
+% Check min average speed condition
+if MB_min_avg_vel_condition_flag
+    for i = 1:size(MB_index_list,2)
+        MB_index = MB_index_list(i);
+        avg_vel = sqrt((MB_log_copy(MB_index).centroid(1,1)-MB_log_copy(MB_index).centroid(end,1))^2+(MB_log_copy(MB_index).centroid(1,2)-MB_log_copy(MB_index).centroid(end,2))^2)/MB_log_copy(MB_index).age(3);      
+        % Check condition
+        if (avg_vel < MB_min_avg_vel_condition)
+            MB_index_list = 0;
+        end
+    end
+    MB_index_list(MB_index_list == 0) = [];
+    MB_index_min_avg_vel = MB_index_list;
+end
+
+% Check avg density condition
+if MB_min_avg_density_condition_flag
+    % Scatter image from all MB locations
+    scatter_matrix = zeros(img_size);
+    for i = 1:size(MB_index_list ,2)
+        MB_index = MB_index_list(i);
+        scatter_matrix(sub2ind(img_size,MB_log_copy(MB_index).centroid(1:end-1,1) ,MB_log_copy(MB_index).centroid(1:end-1,2))) = scatter_matrix(sub2ind(img_size,MB_log_copy(MB_index).centroid(1:end-1,1) ,MB_log_copy(MB_index).centroid(1:end-1,2))) +1;
+    end
+    
+    for i = 1:size(MB_index_list ,2)
+        MB_index = MB_index_list(i);
         
-        avg_vel = sqrt((MB_log_copy(MB_index).centroid(1,1)-MB_log_copy(MB_index).centroid(end,1))^2+(MB_log_copy(MB_index).centroid(1,2)-MB_log_copy(MB_index).centroid(end,2))^2)/MB_log_copy(MB_index).age(3);
+        MB_density_list = []; % Contains number of neighbouring MBs around each MB position
+        MB_length = size(MB_log_copy(MB_index).centroid(1:end-1,1),1);
+        
+        % Calculated density of MB in window
+        for j = 1:MB_length
+            % Update window coordinates
+            MB_window_coord(1,1) = MB_log_copy(MB_index).centroid(j,1)-MB_window_size_density_avg(1); % y1
+            MB_window_coord(2,1) = MB_log_copy(MB_index).centroid(j,1)+MB_window_size_density_avg(1); % y2
+            MB_window_coord(1,2) = MB_log_copy(MB_index).centroid(j,2)-MB_window_size_density_avg(2); % x1
+            MB_window_coord(2,2) = MB_log_copy(MB_index).centroid(j,2)+MB_window_size_density_avg(2); % x2
+            
+            % Check for out of bounce
+            % y1
+            if MB_window_coord(1,1) <= 0
+                MB_window_coord(1,1) = 1;
+            end
+            % y2
+            if MB_window_coord(2,1) > img_size(1)
+                MB_window_coord(2,1) = img_size(1);
+            end
+            % x1
+            if MB_window_coord(1,2) <= 0
+                MB_window_coord(1,2) = 1;
+            end
+            % x2
+            if MB_window_coord(2,2) > img_size(2)
+                MB_window_coord(2,2) = img_size(2);
+            end
+            
+            % Sum number of MB in window
+            MB_density_list(j) = sum(sum(scatter_matrix(MB_window_coord(1,1):MB_window_coord(2,1),MB_window_coord(1,2):MB_window_coord(2,2))))-1; % number of MBs found around given MB with # MB_index
+        end
+        % Calculate average
+        MB_density_sum = sum(MB_density_list)/MB_length;
         
         % Check density condition
-        if (avg_vel >= MB_avg_vel_condition)%
-            MB_index_filter_stuck_vel = [MB_index_filter_stuck_vel, MB_index];
+        if (MB_density_sum < MB_min_avg_density_condition)% && (min(MB_density_list) >= MB_index_inflow_outflow)
+            MB_index_list(i) = 0;
         end
     end
-else
-    MB_index_filter_stuck_vel = MB_index_filter_count;
-end
-%------
-
-MB_index_list = [];
-% List all MB positions and their velocities
-for i = 1:size(MB_index_filter_stuck_vel ,2)
-   MB_index = MB_index_filter_stuck_vel(i);
-   MB_index_list = [MB_index_list, sub2ind([img_size(1:2)],MB_log_copy(MB_index).centroid(1:end-1,1) ,MB_log_copy(MB_index).centroid(1:end-1,2))'];
+    MB_index_list(MB_index_list == 0) = [];
+    MB_index_min_avg_density = MB_index_list;
 end
 
-% Scatter image from all MB locations
-scatter_matrix = zeros([img_size(1:2)]); 
-for i = 1:size(MB_index_list,2)
-    scatter_matrix(MB_index_list(i)) = scatter_matrix(MB_index_list(i)) + 1;
-end
-
-
-% Find avg density of other MB for each MB location
-for i = 1:size(MB_index_filter_stuck_vel ,2)
-    MB_index = MB_index_filter_stuck_vel(i);
-    MB_density_list = [];
-    
-    index_list_MB_index = [sub2ind([img_size(1:2)],MB_log_copy(MB_index).centroid(1:end-1,1) ,MB_log_copy(MB_index).centroid(1:end-1,2))']; % list of positions and vel for given MB
-    
-    % Scatter image without the current MB
-    logical_matrix_MB_index = scatter_matrix;
-    for j = 1:size(index_list_MB_index,2)
-        logical_matrix_MB_index(index_list_MB_index(j)) = logical_matrix_MB_index(index_list_MB_index(j)) - 1; % Removes the MB in interest
-    end
-    
-    % Calculated density of MB in window
-    for j = 1:size(index_list_MB_index,2)
-        % y,x subscripts from direct matrix indexes
-        [subscript_y, subscript_x] = ind2sub([img_size(1:2)],index_list_MB_index(j));
-        
-        % Update window coordinates
-        MB_window_coord(1,1) = subscript_y-MB_window_size_density_avg(1);
-        MB_window_coord(2,1) = subscript_y+MB_window_size_density_avg(1);
-        MB_window_coord(1,2) = subscript_x-MB_window_size_density_avg(2);
-        MB_window_coord(2,2) = subscript_x+MB_window_size_density_avg(2);
-        
-        % Check for out of bounce
-        % y1
-        if MB_window_coord(1,1) <= 0
-            MB_window_coord(1,1) = 1;
-        end
-        % y2
-        if MB_window_coord(2,1) > img_size(1)
-            MB_window_coord(2,1) = img_size(1);
-        end
-        % x1
-        if MB_window_coord(1,2) <= 0
-            MB_window_coord(1,2) = 1;
-        end
-        % x2
-        if MB_window_coord(2,2) > img_size(2)
-            MB_window_coord(2,2) = img_size(2);
-        end
-        
-        % Sum number of MB in window
-        logical_matrix_MB_index_window = logical_matrix_MB_index(MB_window_coord(1,1):MB_window_coord(2,1),MB_window_coord(1,2):MB_window_coord(2,2));
-        MB_density_list(j) = sum(sum(logical_matrix_MB_index_window)); % number of MB's found around given MB with # MB_index
-    end
-    % Calculate average
-    MB_density = sum(MB_density_list)/MB_log_copy(MB_index).age(3);
-    
-    % Check density condition
-    if (MB_density >= MB_dens_condition_avg)% && (min(MB_density_list) >= MB_index_filter_dir)
-        MB_index_filter_avg = [MB_index_filter_avg, MB_index];
-    end
-end
-
-% Find dir
-if kidney_center(1) ~= 0
-    for i = 1:size(MB_index_filter_avg ,2)
-        MB_index = MB_index_filter_avg(i);
-        
-        distance_to_center_start = sqrt((MB_log_copy(MB_index).centroid(1,1)-kidney_center(1))^2+(MB_log_copy(MB_index).centroid(1,2)-kidney_center(2))^2);
-        distance_to_center_end = sqrt((MB_log_copy(MB_index).centroid(end,1)-kidney_center(1))^2+(MB_log_copy(MB_index).centroid(end,2)-kidney_center(2))^2);
+% Find flow towards/away from center coord
+if inflow_outflow_center_coord_condition_flag
+    for i = 1:size(MB_index_list ,2)
+        MB_index = MB_index_list(i);   
+        distance_to_center_start = sqrt((MB_log_copy(MB_index).centroid(1,1)-inflow_outflow_center_coord_condition(1))^2+(MB_log_copy(MB_index).centroid(1,2)-inflow_outflow_center_coord_condition(2))^2);
+        distance_to_center_end = sqrt((MB_log_copy(MB_index).centroid(end,1)-inflow_outflow_center_coord_condition(1))^2+(MB_log_copy(MB_index).centroid(end,2)-inflow_outflow_center_coord_condition(2))^2);
         % Check density condition
-        if (distance_to_center_start < distance_to_center_end)
-            MB_index_filter_dir = [MB_index_filter_dir, MB_index];
+        if ((distance_to_center_start - distance_to_center_end)*inflow_outflow_const)
+            MB_index_list = 0;
         end
     end
-else
-    MB_index_filter_dir = MB_index_filter_avg;
+    MB_index_list(MB_index_list == 0) = [];
+    MB_index_inflow_outflow = MB_index_list;
 end
 
- %----------------------------
-MB_index_list = []; % List of indexes with for found MB's
-% List all MB positions and their velocities
-for i = 1:size(MB_index_filter_dir ,2)
-    MB_index = MB_index_filter_dir(i);
-    MB_index_list = [MB_index_list, sub2ind([img_size(1:2)],MB_log_copy(MB_index).centroid(1:end-1,1) ,MB_log_copy(MB_index).centroid(1:end-1,2))'];
-end
-
-% Scatter image from all MB locations
-scatter_matrix = zeros([img_size(1:2)]); 
-for i = 1:size(MB_index_list,2)
-    scatter_matrix(MB_index_list(i)) = scatter_matrix(MB_index_list(i)) + 1;
-end
-
- %-----------------------------
- n_vel_avg = 50;
- 
- if n_vel_avg > MB_age_condition_min-2
-     n_vel_avg = MB_age_condition_min-2;
- end
- % Smooth velocities
- for i = 1:size(MB_index_filter_single,2)
-     MB_index = MB_index_filter_single(i);
-    for j = 1:MB_log_copy(MB_index).age(3)-1
-        if floor(j-(n_vel_avg-1)/2) < 1
-            MB_log_copy(MB_index).vel(j,1) = sum(MB_log_copy(MB_index).vel(1:1+(n_vel_avg-1),1))/n_vel_avg;
-            MB_log_copy(MB_index).vel(j,2) = sum(MB_log_copy(MB_index).vel(1:1+(n_vel_avg-1),2))/n_vel_avg;
-        elseif floor(j+(n_vel_avg-1)/2) > MB_log_copy(MB_index).age(3)-1
-            MB_log_copy(MB_index).vel(j,1) = sum(MB_log_copy(MB_index).vel(MB_log_copy(MB_index).age(3)-1-(n_vel_avg-1):MB_log_copy(MB_index).age(3)-1,1))/n_vel_avg;
-            MB_log_copy(MB_index).vel(j,2) = sum(MB_log_copy(MB_index).vel(MB_log_copy(MB_index).age(3)-1-(n_vel_avg-1):MB_log_copy(MB_index).age(3)-1,2))/n_vel_avg;
-        else
-            MB_log_copy(MB_index).vel(j,1) = sum(MB_log_copy(MB_index).vel(floor(j-(n_vel_avg-1)/2):floor(j+(n_vel_avg-1)/2),1))/n_vel_avg;
-            MB_log_copy(MB_index).vel(j,2) = sum(MB_log_copy(MB_index).vel(floor(j-(n_vel_avg-1)/2):floor(j+(n_vel_avg-1)/2),2))/n_vel_avg;
+% Smooth velocities
+if smooth_vel_dir_flag
+    if smooth_vel_dir_length > MB_age_min_condition-2
+        smooth_vel_dir_length = MB_age_min_condition-2;
+    end
+    for i = 1:size(MB_index_list,2)
+        MB_index = MB_index_list(i);
+        for j = 1:MB_log_copy(MB_index).age(3)-1
+            if floor(j-(smooth_vel_dir_length-1)/2) < 1
+                MB_log_copy(MB_index).vel(j,1) = sum(MB_log_copy(MB_index).vel(1:1+(smooth_vel_dir_length-1),1))/smooth_vel_dir_length;
+                MB_log_copy(MB_index).vel(j,2) = sum(MB_log_copy(MB_index).vel(1:1+(smooth_vel_dir_length-1),2))/smooth_vel_dir_length;
+            elseif floor(j+(smooth_vel_dir_length-1)/2) > MB_log_copy(MB_index).age(3)-1
+                MB_log_copy(MB_index).vel(j,1) = sum(MB_log_copy(MB_index).vel(end-(smooth_vel_dir_length-1):end-1,1))/smooth_vel_dir_length;
+                MB_log_copy(MB_index).vel(j,2) = sum(MB_log_copy(MB_index).vel(end-(smooth_vel_dir_length-1):end,2))/smooth_vel_dir_length;
+            else
+                MB_log_copy(MB_index).vel(j,1) = sum(MB_log_copy(MB_index).vel(floor(j-(smooth_vel_dir_length-1)/2):floor(j+(smooth_vel_dir_length-1)/2),1))/smooth_vel_dir_length;
+                MB_log_copy(MB_index).vel(j,2) = sum(MB_log_copy(MB_index).vel(floor(j-(smooth_vel_dir_length-1)/2):floor(j+(smooth_vel_dir_length-1)/2),2))/smooth_vel_dir_length;
+            end
         end
     end
- end
+end
  
-% List of MB positions and their velocities satisfying conditions
-MB_index_list = [];
-MB_coord_list = [];
-MB_vel_list = [];
-for i = 1:size(MB_index_filter_dir,2)
-  MB_index = MB_index_filter_dir(i);
-  MB_index_list = [MB_index_list, sub2ind([img_size(1:2)],MB_log_copy(MB_index).centroid(2:end-1,1) ,MB_log_copy(MB_index).centroid(2:end-1,2))'];
-  MB_coord_list = [MB_coord_list, MB_log_copy(MB_index).centroid(2:end-1,:)'];
-  MB_vel_list = [MB_vel_list, [MB_log_copy(MB_index).vel(2:end,1),MB_log_copy(MB_index).vel(2:end,2)]'];
-end
-% MB_vel_list_abs = sqrt(MB_vel_list(1,:).^2+MB_vel_list(2,:).^2)* 10*10^(-6)*fps*10^3;
-% MB_vel_list_dir = mod(atan2(MB_vel_list(1,:),MB_vel_list(2,:))+5/2*pi,2*pi);
 
-% Scatter image from all MB locations
-scatter_matrix = zeros([img_size(1:2)]); 
-for i = 1:size(MB_index_list,2)
-    scatter_matrix(MB_index_list(i)) = scatter_matrix(MB_index_list(i)) + 1;
-end
-
-% % Velocity img, Amplitude and direction
-% % Final velocity and direction img
-% vel_abs_img = zeros([img_size(1:2)]);
-% vel_dir_img = zeros([img_size(1:2)]);
-% 
-% % Weighing filter for weighted velocities
-% %weighing_filter_radius = 3; % Radius around centroid to be considered
-% weighing_filter_size = 2*weighing_filter_radius+1; % Must be an odd number
-% weighing_filter_halfsize = floor(weighing_filter_size/2); % Only to make indexing easier
-% weighing_filter = zeros(weighing_filter_size); % Contains the final filter
-% weighing_center = [ceil(weighing_filter_size/2),ceil(weighing_filter_size/2)]; % Center coordinates
-% %weighing_factor = 1; % Distance weighing factor
-% 
-% % Makes linear weighing filter for full square
-% for i = 1:size(weighing_filter,1)
-%     for j = 1:size(weighing_filter,2)
-%         weighing_filter(i,j) = sqrt((i-weighing_center(1))^2+(j-weighing_center(2))^2);
-%     end
-% end
-% 
-% % Discard indexes with larger radius than weighing_filter_radius
-% if weighing_factor == 0
-%     weighing_filter = zeros(size(weighing_filter));
-%     weighing_filter(ceil(size(weighing_filter,1)/2),ceil(size(weighing_filter,2)/2)) = 1;
-% else
-%     temp_weighing_filter = weighing_filter;
-%     temp_weighing_filter(weighing_filter > weighing_filter_radius) = 0;
-%     temp_weighing_filter(weighing_filter <= weighing_filter_radius) = 1;
-%     weighing_filter = weighing_filter * 1/weighing_factor;
-%     weighing_filter = exp(-(weighing_filter/weighing_filter_radius).^2);
-%     weighing_filter = weighing_filter.*temp_weighing_filter;
-% end
-% 
-% % Velocity matrix
-% vel_logical_matrix = zeros([img_size(1:2)]);
-% vel_x = zeros([img_size(1:2)]); % x-part of velocity
-% vel_y = zeros([img_size(1:2)]); % y-part of velocity
-% 
-% for i = 1:size(MB_index_list,2)
-%     vel_x(MB_index_list(i)) = vel_x(MB_index_list(i)) + MB_vel_list(2,i);
-%     vel_y(MB_index_list(i)) = vel_y(MB_index_list(i)) + MB_vel_list(1,i);
-%     vel_logical_matrix(MB_index_list(i)) = vel_logical_matrix(MB_index_list(i)) + 1;
-% end
-% 
-% % Weight multiple occuring positions
-% vel_x(find(vel_x > 0)) = vel_x(find(vel_x > 0))./vel_logical_matrix(find(vel_x > 0));
-% vel_y(find(vel_y > 0)) = vel_y(find(vel_y > 0))./vel_logical_matrix(find(vel_y > 0));
-% vel_logical_matrix(vel_logical_matrix > 1) = 1;
-% 
-% % y,x subscripts from direct matrix indexes
-% [subscript_y, subscript_x] = ind2sub([img_size(1:2)],MB_index_list);
-% 
-% % Temporary window and coordinates area in interst
-% vel_window_coord = [];
-% vel_window = []; 
-% vel_window_y = [];
-% vel_window_x = [];
-% 
-% for i = 1:size(MB_index_list,2)
-%     
-%     % Update window coordinates
-%     vel_window_coord(1,1) = subscript_y(i)-weighing_filter_halfsize;
-%     vel_window_coord(2,1) = subscript_y(i)+weighing_filter_halfsize;
-%     vel_window_coord(1,2) = subscript_x(i)-weighing_filter_halfsize;
-%     vel_window_coord(2,2) = subscript_x(i)+weighing_filter_halfsize;
-%     
-%     % Check for out of bounce
-%     if (vel_window_coord(1,1) > 0) && (vel_window_coord(2,1) < img_size(1)) && (vel_window_coord(1,2) > 0) && (vel_window_coord(2,2) < img_size(2))
-%         % Windows of interest around specific position
-%         vel_window = vel_logical_matrix(vel_window_coord(1,1):vel_window_coord(2,1),vel_window_coord(1,2):vel_window_coord(2,2));
-%         vel_window_y = vel_y(vel_window_coord(1,1):vel_window_coord(2,1),vel_window_coord(1,2):vel_window_coord(2,2));
-%         vel_window_x = vel_x(vel_window_coord(1,1):vel_window_coord(2,1),vel_window_coord(1,2):vel_window_coord(2,2));
-%         
-%         % Distance weighting exp(-(d_i/r)^2)
-%         vel_weight_matrix = weighing_filter.*vel_window;
-%         
-%         % Sum of all weightings
-%         vel_weight_Z = sum(vel_weight_matrix(:)); 
-%         
-%         % Final weighted velocities
-%         vel_weight_y = sum(sum(1/vel_weight_Z*vel_weight_matrix.*vel_window_y));
-%         vel_weight_x = sum(sum(1/vel_weight_Z*vel_weight_matrix.*vel_window_x));
-%         
-%         % insert weighted velocities to right positions
-%         vel_y(MB_index_list(i)) = vel_weight_y;
-%         vel_x(MB_index_list(i)) = vel_weight_x;
-%     end
-% end
-% 
-% % Calculate absolute velocity
-% vel_abs_img = sqrt(vel_y.^2+vel_x.^2);
-% % Correct for pixel resolution 
-% vel_abs_img = vel_abs_img * 10*10^(-6)*fps*10^3;
-% 
-% % Color map for direction img
-% colormap_vel_dir = hsv;
-% colormap_vel_dir(1,:) = [0 0 0];
-% 
-% % Direction img. Outputs in radians
-% vel_dir_img = atan2(vel_y,vel_x);
-% % From [-pi,pi] -> [0,2*pi]
-% vel_dir_img(vel_dir_img ~= 0) = vel_dir_img(vel_dir_img ~= 0) + pi;
-% % Turn colordisk
-% color_rotate = 3/2*pi;
-% vel_dir_img(vel_dir_img ~= 0) = mod(vel_dir_img(vel_dir_img ~= 0) + color_rotate,2*pi);
-% 
-% % Subscripts and index of non zero data pixels (both for vel and dir)
-% [vel_abs_img_list_y vel_abs_img_list_x] = ind2sub(size(vel_abs_img),find(vel_abs_img(:) > 0)); 
-% vel_abs_img_list = find(vel_abs_img(:));
-% 
-% 
-% % List dir values at non-zero indexes
-% vel_dir_img_list_val = vel_dir_img(vel_abs_img_list);
-% % Adjust dir values to lay between [1:64] for colormap
-% vel_dir_img_list_val = floor(vel_dir_img_list_val/(2*pi)*63+1);
-% %----
-
-
-%% Make direction image
+% Make direction image
 % Make figure handle
 fh = figure; clf;
 % set position on screen
 set(fh,'position',[-1850 570 560 420]);
-subplot(1,2,1);
+% subplot(1,2,1);
 
 % Dir scatter plot
 % colormapping for direction img
@@ -343,8 +230,8 @@ MB_YData = [];
 MB_CData = [];
 
 i_end = 1;
-for i = 1:size(MB_index_filter_dir,2)
-    MB_index = MB_index_filter_dir(i);
+for i = 1:size(MB_index_list,2)
+    MB_index = MB_index_list(i);
     
     i_start = i_end;
     i_end = i_end+MB_log_copy(MB_index).age(3)-3;
@@ -353,7 +240,7 @@ for i = 1:size(MB_index_filter_dir,2)
     MB_YData = [MB_YData MB_log_copy(MB_index).centroid(2:end-1,1)'];
     MB_CData = [MB_CData; dir_color(floor(mod(atan2(MB_log_copy(MB_index).vel(2:end,1),MB_log_copy(MB_index).vel(2:end,2))+5/2*pi,2*pi)/(2*pi)*63+1),:)];% setting colors of individual dots depending on direction
 end
-MB_index_list = [];
+% MB_index_list = [];
 % MB_coord_list = [];
 % MB_vel_list = [];
 fig.XData = MB_XData;
@@ -361,20 +248,17 @@ fig.YData = MB_YData;
 fig.CData = MB_CData;
 
 % Scatterplot settings
-set(fig,'SizeData', 0.5); % size of dots
+set(fig,'SizeData', 20);%0.5); % size of dots
 set(fig,'MarkerFacecolor','flat'); % appearance of dots
 xlabel('Lateral [mm]'); ylabel('Axial [mm]'); % title('Micro-Bubble image');
-set(gca,'Xtick',linspace(50,1000,6)); set(gca, 'XTickLabel',linspace(0,10,6));
-set(gca,'Ytick',linspace(60,1950,11)); set(gca, 'YTickLabel',linspace(0,20,11));
+set(gca,'Xtick',linspace(0,size(lateral_axis,2),6)); set(gca, 'XTickLabel',linspace(round(lateral_axis(1)*1000),round(lateral_axis(end)*1000),6));
+set(gca,'Ytick',linspace(0,size(depth_axis,2),6)); set(gca, 'YTickLabel',linspace(round(depth_axis(1)*1000),round(depth_axis(end)*1000),6));
 set(gca, 'DataAspectRatio',[1 1 1]) % set data aspect ratio in zoom box
 set(gca, 'PlotBoxAspectRatio',[1 1 1])
 set(gca, 'YDir','reverse'); % reverse y-axis
 set(gca, 'Box','on');
-xlim([50 1000]);
-ylim([60 1950]);
-% xlim([1 img_size(2)]);
-% ylim([1 img_size(1)]);
-
+xlim([0 size(lateral_axis,2)]);
+ylim([0 size(depth_axis,2)]);
 
 
 %% Make direction movie
@@ -391,25 +275,25 @@ fig = scatter(0, 0);
 set(fig,'SizeData', 0.5); % size of dots
 set(fig,'MarkerFacecolor','flat'); % appearance of dots
 xlabel('Lateral [mm]'); ylabel('Axial [mm]'); % title('Micro-Bubble image');
-set(gca,'Xtick',linspace(50,1000,6)); set(gca, 'XTickLabel',linspace(0,10,6));
-set(gca,'Ytick',linspace(60,1950,11)); set(gca, 'YTickLabel',linspace(0,20,11));
+set(gca,'Xtick',linspace(0,945,6)); set(gca, 'XTickLabel',linspace(lateral_axis(1),lateral_axis(end),6));
+set(gca,'Ytick',linspace(0,769,6)); set(gca, 'YTickLabel',linspace(depth_axis(1),depth_axis(end),6));
 set(gca, 'DataAspectRatio',[1 1 1]) % set data aspect ratio in zoom box
 set(gca, 'PlotBoxAspectRatio',[1 1 1])
 set(gca, 'YDir','reverse'); % reverse y-axis
 set(gca, 'Box','on');
-xlim([50 1000]);
-ylim([60 1950]);
+% xlim([50 1000]);
+% ylim([60 1950]);
 
 
 outputVideo=VideoWriter(['mb_tracking_vid_inflow_1']);
 outputVideo.FrameRate=20;
 open(outputVideo);
-mov(1:size(MB_index_filter_dir,2))= struct('cdata',[],'colormap',[]);
+mov(1:size(MB_index_list,2))= struct('cdata',[],'colormap',[]);
 pause(0.2)
 
 i_end = 1;
-for i = 1:size(MB_index_filter_dir,2)
-    MB_index = MB_index_filter_dir(i);
+for i = 1:size(MB_index_list,2)
+    MB_index = MB_index_list(i);
     
     i_start = i_end;
     i_end = i_end+MB_log_copy(MB_index).age(3)-3;
@@ -432,10 +316,6 @@ fh = figure; clf;
 vel_color = autumn;
 vel_color = (vel_color);
 
-% Max and min value for colormap
-val_range_max = 1.5;
-val_range_min = 0;
-
 % set position on screen
 set(fh,'position',[-1850 570 560 420]);
 % subplot(1,2,1);
@@ -449,8 +329,8 @@ MB_YData = [];
 MB_VelData = [];
 
 i_end = 1;
-for i = 1:size(MB_index_filter_dir,2)
-    MB_index = MB_index_filter_dir(i);
+for i = 1:size(MB_index_list,2)
+    MB_index = MB_index_list(i);
     
     i_start = i_end;
     i_end = i_end+MB_log_copy(MB_index).age(3)-3;
@@ -460,8 +340,11 @@ for i = 1:size(MB_index_filter_dir,2)
     MB_VelData = [MB_VelData sqrt((MB_log_copy(MB_index).vel(2:end,2)).^2 + (MB_log_copy(MB_index).vel(2:end,1)).^2)'];
 end
 
-MB_VelData = MB_VelData * 10*10^(-6)*fps*10^3;
+% Max and min value for colormap
+val_range_max = 25;
+val_range_min = 5;
 
+MB_VelData = MB_VelData * 10*10^(-6)*fps*10^3;
 MB_VelData(find(MB_VelData > val_range_max)) = val_range_max; 
 MB_VelData(find(MB_VelData < val_range_min)) = val_range_min;
 MB_VelData = MB_VelData-val_range_min;
@@ -472,29 +355,25 @@ fig.YData = MB_YData;
 fig.CData = MB_CData;
 
 % Scatterplot settings
-set(fig,'SizeData', 0.5); % size of dots
+set(fig,'SizeData', 20);%0.5); % size of dots
 set(fig,'MarkerFacecolor','flat'); % appearance of dots
 xlabel('Lateral [mm]'); ylabel('Axial [mm]'); % title('Micro-Bubble image');
-set(gca,'Xtick',linspace(50,1000,6)); set(gca, 'XTickLabel',linspace(0,10,6));
-set(gca,'Ytick',linspace(60,1950,11)); set(gca, 'YTickLabel',linspace(0,20,11));
+set(gca,'Xtick',linspace(0,945,6)); set(gca, 'XTickLabel',linspace(round(lateral_axis(1)*1000),round(lateral_axis(end)*1000),6));
+set(gca,'Ytick',linspace(0,769,6)); set(gca, 'YTickLabel',linspace(round(depth_axis(1)*1000),round(depth_axis(end)*1000),6));
 set(gca, 'DataAspectRatio',[1 1 1]) % set data aspect ratio in zoom box
 set(gca, 'PlotBoxAspectRatio',[1 1 1])
 set(gca, 'YDir','reverse'); % reverse y-axis
 set(gca, 'Box','on');
-xlim([50 1000]);
-ylim([60 1950]);
-% xlim([1 img_size(2)]);
-% ylim([1 img_size(1)]);
 
-% %Colorbar prop
+%Colorbar prop
 ch = colorbar;
 % set(ch,'position',[0.5729 0.5795 0.0306 0.3167]);
- set(ch,'TicksMode','manual');
- set(ch,'Ticks',linspace(0, 1,6));
- set(ch,'TickLabelsMode','manual');
- set(ch,'TickLabels',fliplr(linspace(val_range_min, val_range_max,6)));
- colormap(flipud(vel_color));
- ylabel(ch,'Velocity [mm/s]')
+set(ch,'TicksMode','manual');
+set(ch,'Ticks',linspace(0, 1,6));
+set(ch,'TickLabelsMode','manual');
+set(ch,'TickLabels',fliplr(linspace(val_range_min, val_range_max,6)));
+colormap(flipud(vel_color));
+ylabel(ch,'Velocity [mm/s]')
 
 
 %% Color-wheel
@@ -527,13 +406,13 @@ hsvImage = cat(3, h, s, v);
 rgbImage = hsv2rgb(hsvImage);
 
 hold on
+% % Position Colorwheel
+% ac = axes('Position',[0.330 0.1320 0.153 0.153]);
+% 
+% % Show colorwheel
+% imshow(rgbImage);
 % Position Colorwheel
-ac = axes('Position',[0.330 0.1320 0.153 0.153]);
-
-% Show colorwheel
-imshow(rgbImage);
-% Position Colorwheel
-ac = axes('Position',[0.770 0.1320 0.153 0.153]);
+ac = axes('Position',[0.350 0.24 0.153 0.153]);
 
 % Show colorwheel
 imshow(rgbImage);
@@ -550,15 +429,16 @@ colormap('red');
 
 %% Density image using hist3
 hist_data = hist3([subscript_x; subscript_y]',[1000 600]);
+hist_data = hist3(fliplr(MB_coord_list'),[1000 600]);
 hist_data = hist_data';
 norm = max(hist_data(:));
 log_hist_data = 20*log10(hist_data/norm);
 figure();
 imagesc(log_hist_data);
 colormap(hot);
-set(gca, 'YDir','reverse')
-set(gca,'Xtick',linspace(0,350,5)); set(gca, 'XTickLabel',linspace(0,12,5));
-set(gca,'Ytick',linspace(0,350,6)); set(gca, 'YTickLabel',linspace(0,25,6));
+% set(gca, 'YDir','reverse')
+set(gca,'Xtick',linspace(0,350,5)); set(gca, 'XTickLabel','');
+set(gca,'Ytick',linspace(0,350,6)); set(gca, 'YTickLabel','');
 
 xlabel('Lateral [mm]'); ylabel('Axial [mm]'); % title('Micro-Bubble image');
 % set(gca, 'DataAspectRatio',[1 1 1]) % set data aspect ratio in zoom box
@@ -690,8 +570,8 @@ MB_YData = [];
 MB_CData = [];
 
 i_end = 1;
-for i = 1:size(MB_index_filter_dir,2)
-    MB_index = MB_index_filter_dir(i);
+for i = 1:size(MB_index_list,2)
+    MB_index = MB_index_list(i);
     
     i_start = i_end;
     i_end = i_end+MB_log_copy(MB_index).age(3)-3;
@@ -704,7 +584,7 @@ end
 outputVideo=VideoWriter(['mb_tracking_vid_mc']);
 outputVideo.FrameRate=15;
 open(outputVideo);
-mov(1:size(MB_index_filter_dir,2))= struct('cdata',[],'colormap',[]);
+mov(1:size(MB_index_list,2))= struct('cdata',[],'colormap',[]);
 pause(0.2)
 
 for i = 1:size(MB_XData,2)
@@ -767,9 +647,9 @@ figure();
 load('/data/cfudata6/s134082/MB_tracking_matlab/Movement_compensation/MT_with_pulse_3_rep.mat')
 plot(axial_vel_mean(44,:),'k');
 xlim([1 1290]); ylim([-2 2.5]);
-set(gca,'Xtick',linspace(1,1290,8)); set(gca, 'XTickLabel',linspace(0,42,8));
+set(gca,'Xtick',linspace(1,1290,6)); set(gca, 'XTickLabel',linspace(0,2.5,6));
 set(gca,'Ytick',linspace(-2,2,5)); set(gca, 'YTickLabel',linspace(-50,50,5));
-xlabel('Time [ms]'); ylabel('Axial [µm]'); % title('Micro-Bubble image');
+xlabel('Time [s]'); ylabel('Axial [µm]'); % title('Micro-Bubble image');
 
 %%
 % subplot(1,2,2)
@@ -777,15 +657,15 @@ figure();
 load('/data/cfudata6/s134082/MB_tracking_matlab/Movement_compensation/MT_without_pulse.mat')
 plot(axial_vel_mean(44,:),'k');
 xlim([1 430]); ylim([-2 2.5]);
-set(gca,'Xtick',linspace(1,370,3)); set(gca, 'XTickLabel',linspace(0,12,3));
+set(gca,'Xtick',linspace(1,370,3)); set(gca, 'XTickLabel',linspace(0,0.8,3));
 set(gca,'Ytick',linspace(-2,2,5)); set(gca, 'YTickLabel',linspace(-50,50,5));
-xlabel('Time [ms]'); ylabel('Axial [µm]'); % title('Micro-Bubble image');
+xlabel('Time [s]'); ylabel('Axial [µm]'); % title('Micro-Bubble image');
 
 %%
 figure();
 load('/data/cfudata6/s134082/MB_tracking_matlab/Movement_compensation/MT_pulse_1_rep.mat')
 plot(axial_vel_mean(44,:),'k');
 xlim([1 430]); ylim([-2 2.5]);
-set(gca,'Xtick',linspace(1,370,3)); set(gca, 'XTickLabel',linspace(0,12,3));
+set(gca,'Xtick',linspace(1,370,3)); set(gca, 'XTickLabel',linspace(0,0.8,3));
 set(gca,'Ytick',linspace(-2,2,5)); set(gca, 'YTickLabel',linspace(-50,50,5));
 xlabel('Time [ms]'); ylabel('Axial [µm]'); % title('Micro-Bubble image');

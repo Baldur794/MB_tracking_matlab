@@ -26,11 +26,11 @@ job = createJob(sched);
 
 %%
 
-idx_frame_start = 1000:1000:1000;
+idx_frame_start = 1000:1000:36000;
 
 for i=1:size(idx_frame_start,2)
         disp(sprintf('Task:%d',i));
-        createTask(job, @MB_tracking_func_1, 2, {idx_frame_start(i), i});
+        createTask(job, @MB_tracking_func_4, 2, {idx_frame_start(i), i});
 end
 
 %%
@@ -71,7 +71,7 @@ for i = 1:size(data,2)
 end
 %%
 MB_log = [];
-for i = 1:25
+for i = 5:5
     load(['Task' num2str(i,'%d') '.out.mat'])
     MB_log = [MB_log argsout{1,1}{1,1}];
 end

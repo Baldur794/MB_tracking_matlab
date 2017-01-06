@@ -1,84 +1,100 @@
-% Image parameters
-MB_age_condition_min = 100;
-MB_age_condition_max = 3000;
+log_compression = @(x) 20*log10(x/max(x(:)));
 
-MB_frame_condition_min = 0; % 0 -> condition not used
-MB_frame_condition_max = 5000;
+% Folder path to data 
+folderName = '/data/cfudata3/ramosh/cavh/microbubble-experiments/Part6-PM_Half_Front_10V_6_5MHz_2Beam1Line_Flow_Ramp_5uls_to_0uls_180s_1to100';
+
+%% Read usecase
+usecase_xml = xmlread([folderName '/usecase.xml']);
+% read sampling rate
+temp = usecase_xml.getElementsByTagName('receiveSampleFrequency');
+sampling_rate = str2double(temp.item(0).getFirstChild.getData);
+% read start line
+temp = usecase_xml.getElementsByTagName('actualStartLine');
+start_line = str2double(temp.item(0).getFirstChild.getData);
+% read end line
+temp = usecase_xml.getElementsByTagName('actualStopLine');
+end_line = str2double(temp.item(0).getFirstChild.getData);
+% read element pitch
+temp = usecase_xml.getElementsByTagName('pitch');
+element_pitch = str2double(temp.item(0).getFirstChild.getData);
+% read line density
+temp = usecase_xml.getElementsByTagName('lineDensity');
+line_density = str2double(temp.item(0).getFirstChild.getData);
+% read stop depth
+temp = usecase_xml.getElementsByTagName('actualStopDepth');
+stop_depth = str2double(temp.item(0).getFirstChild.getData);
+% read wave sample to calculate center_frequency
+Tx_transmit_rate = 120e6;
+pulse_per_wawe = 1.5;
+center_frequency = (str2double(temp.item(0).getFirstChild.getData)/(Tx_transmit_rate*pulse_per_wawe))^(-1);
+
+%% Image parameters
+
+% Area of interst
+area_of_interest.axial_init= 950; 
+area_of_interest.axial_end= 1250; 
+area_of_interest.lateral_init= 1; 
+area_of_interest.lateral_end= 60; 
+
+% Wanted resolution
+img_resolution.axial_new = 10e-6;
+img_resolution.lateral_new = 10e-6;
+
+img_type = 'PI';
 
 
-MB_count_condition = 20; % Number of areas within search windows
-MB_window_size_density_avg = [5 3]; % Window for density condition
-MB_window_size_density_stuck = [10 10]; % Window for density condition
-MB_window_size_density_single = [5 5]; % Window for density condition
-MB_dens_condition_avg = 0; % Density condition average
-MB_avg_vel_condition = 0.5;
-kidney_center = [977,1]; % [0,0] -> condition not used
-fps = 47;
-img_size = [2489,1183];
 
-% weighing_factor = 0; % Distance weighing factor
-% weighing_filter_radius = 3; % Radius around centroid to be considered
-
-
-
+%% Tracking parameters
 % Tracking parameters
 MB_window_coord_search = zeros(2,2); % Coordinates for search window
 MB_window_coord_search_clear = zeros(2,2); % Coordinates for search clear window
 
 MB_window_size_search_localization = [30 30]; % [y,x] Search window for localization of PSF's
-MB_window_size_search_new = [3 3]; % [y,x] Search window for new MB's
-MB_window_size_search_existing = [3 3]; % [y,x] Search window for ''old'' MB's
-MB_window_size_search_clear = [40 40]; % [y,x] Search window for ''old'' MB's
+MB_window_size_search_new = [20 20]; % [y,x] Search window for new MB's
+MB_window_size_search_existing = [20 20]; % [y,x] Search window for ''old'' MB's
+MB_window_size_search_clear = [20 40]; % [y,x] Search window for ''old'' MB's
 MB_window_threshold = 1.3; % Window Threshold (actual MB_window_threshold = Max_intensity*1/threshold)
 
-% Load parameter
-n_bck = 50; 
-v_MB = 0.2*10^(-3);
-idx_frame_start = 3970;%4550;%3970;
-idx_comp_sync = 900;
 
-nframe = 10;
-
-interpolation_type = 'spline';
-
-load('mov_x_comp_contrast_sync_900');
-load('mov_y_comp_contrast_sync_900');
-
-%%
-MB_window_out_of_bounce = 0; % Checks if search windows is outside image
+idx_frame_start = 500;
+nframe = 100;
 
 % initializing MB struct
-MB_index = 0; % Index for each MB
-MB = []; % Current MB
-MB.state = 0;
-MB.old_pos = zeros(1,2);
-MB.new_pos = zeros(1,2);
-MB.vel = zeros(1,2); 
-MB.max_int = 0;
-MB.centroid = zeros(1,2);
-MB.area = 0;
-MB.eccentricity = 0;
-MB.orientation = 0;
-MB.perimeter = 0;
-MB.id = 0;
-MB.count = 0;
-MB_log = MB;
+
+MB_log = []; % Current MB
+MB_log.state = 0;
+MB_log.old_pos = zeros(1,2);
+MB_log.new_pos = zeros(1,2);
+MB_log.vel = zeros(1,2); 
+MB_log.max_int = 0;
+MB_log.centroid = zeros(1,2);
+MB_log.area = 0;
+MB_log.eccentricity = 0;
+MB_log.orientation = 0;
+MB_log.perimeter = 0;
+MB_log.id = 0;
+MB_log.count = 0;
+% MB_log = MB;
+
+MB_idx = 0; % Index for each MB
+MB_window_out_of_bounce_flag = 0; % Checks if search windows is outside image
 
 tic
 for idx_frame=idx_frame_start:idx_frame_start+nframe
     idx_frame
+    
     % Load img
-    img = load_img_contrast(idx_frame,idx_comp_sync,n_bck,v_MB,mov_x_comp_contrast,mov_y_comp_contrast);
+    [PI_img, time_stamp, line_count] = load_img(idx_frame, img_type, folderName, img_resolution, area_of_interest);
 
     % Calculate threshold
-    SEM = std(img(:));
-    ts = tinv(0.9999,length(img(:))-1);     
-    CI = mean(img(:)) + ts*SEM;
+    SEM = std(PI_img(:));
+    ts = tinv(0.9999,length(PI_img(:))-1);     
+    CI = mean(PI_img(:)) + ts*SEM;
     global_threshold = CI;
 
     
     % Threshold
-    img_global_threshold = img;
+    img_global_threshold = PI_img;
     img_global_threshold(img_global_threshold < global_threshold) = 0;
 %     figure(); imagesc(img_global_threshold); colormap('gray');%---
     
@@ -86,26 +102,28 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
     [img_blob_label_global,blob_count_global] = bwlabel(img_global_threshold,4);
     
     % Sort MB's after intensity
-    MB_sort_index = logical([MB.state]);
-    [~,MB_sort_index] = sort([MB.max_int].*MB_sort_index,'descend');
+    [~,MB_sort_index] = sort([MB_log.state],'descend');
   
     % Connect MB's
-    for i = 1:sum([MB.state])
+    for i = 1:sum(logical([MB_log.state]))
         % Update MB_index
-        MB_index = MB_sort_index(i);
-
+        MB_idx = MB_sort_index(i);
+        
+        % Last recorded position:
+        MB_pos_y = MB_log(MB_idx).new_pos(end,1);
+        MB_pos_x = MB_log(MB_idx).new_pos(end,2);
+        
         % Update window coordinates
-         % Update window coordinates
-        if MB(MB_index).age(3) == 1
-            MB_window_coord_search(1,1) = MB(MB_index).new_pos(1)-MB_window_size_search_new(1);
-            MB_window_coord_search(2,1) = MB(MB_index).new_pos(1)+MB_window_size_search_new(1);
-            MB_window_coord_search(1,2) = MB(MB_index).new_pos(2)-MB_window_size_search_new(2);
-            MB_window_coord_search(2,2) = MB(MB_index).new_pos(2)+MB_window_size_search_new(2);
+        if MB_log(MB_idx).age(3) == 1
+            MB_window_coord_search(1,1) = MB_pos_y-MB_window_size_search_new(1);
+            MB_window_coord_search(2,1) = MB_pos_y+MB_window_size_search_new(1);
+            MB_window_coord_search(1,2) = MB_pos_x-MB_window_size_search_new(2);
+            MB_window_coord_search(2,2) = MB_pos_x+MB_window_size_search_new(2);
         else
-            MB_window_coord_search(1,1) = MB(MB_index).new_pos(1)-MB_window_size_search_existing(1);%+MB(MB_index).vel(1);
-            MB_window_coord_search(2,1) = MB(MB_index).new_pos(1)+MB_window_size_search_existing(1);%+MB(MB_index).vel(1);
-            MB_window_coord_search(1,2) = MB(MB_index).new_pos(2)-MB_window_size_search_existing(2);%+MB(MB_index).vel(2);
-            MB_window_coord_search(2,2) = MB(MB_index).new_pos(2)+MB_window_size_search_existing(2);%+MB(MB_index).vel(2);
+            MB_window_coord_search(1,1) = MB_pos_y-MB_window_size_search_existing(1)+MB(MB_index).vel(1);
+            MB_window_coord_search(2,1) = MB_pos_y+MB_window_size_search_existing(1)+MB(MB_index).vel(1);
+            MB_window_coord_search(1,2) = MB_pos_x-MB_window_size_search_existing(2)+MB(MB_index).vel(2);
+            MB_window_coord_search(2,2) = MB_pos_x+MB_window_size_search_existing(2)+MB(MB_index).vel(2);
         end
         
         % Check for out of bounce
@@ -116,8 +134,8 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
             MB_window_out_of_bounce = 1;
         end
         % y_end
-        if MB_window_coord_search(2,1) > size(img,1)
-            MB_window_coord_search(2,1) = size(img,1);
+        if MB_window_coord_search(2,1) > size(PI_img,1)
+            MB_window_coord_search(2,1) = size(PI_img,1);
             MB_window_out_of_bounce = 1;
         end
         % x_start
@@ -126,13 +144,14 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
             MB_window_out_of_bounce = 1;
         end
         % x_end
-        if MB_window_coord_search(2,2) > size(img,2)
-            MB_window_coord_search(2,2) = size(img,2);
+        if MB_window_coord_search(2,2) > size(PI_img,2)
+            MB_window_coord_search(2,2) = size(PI_img,2);
             MB_window_out_of_bounce = 1;
         end       
         
         % Create temp window
         img_temp_window = img_global_threshold(MB_window_coord_search(1,1):MB_window_coord_search(2,1),MB_window_coord_search(1,2):MB_window_coord_search(2,2));
+%       figure(); imagesc(img_temp_window); colormap('gray');%---
         
          % Check if any blobs are within window
         if any(img_temp_window(:))                            
@@ -164,9 +183,9 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
                 MB_window_out_of_bounce = 1;
             end
             % y_end
-            if MB_window_coord_search(2,1) > size(img,1) || MB_window_coord_search_clear(2,1) > size(img,1)
-                MB_window_coord_search(2,1) = size(img,1);
-                MB_window_coord_search_clear(2,1) = size(img,1);
+            if MB_window_coord_search(2,1) > size(PI_img,1) || MB_window_coord_search_clear(2,1) > size(PI_img,1)
+                MB_window_coord_search(2,1) = size(PI_img,1);
+                MB_window_coord_search_clear(2,1) = size(PI_img,1);
                 MB_window_out_of_bounce = 1;
             end
             % x_start
@@ -176,14 +195,14 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
                 MB_window_out_of_bounce = 1;
             end
             % x_end
-            if MB_window_coord_search(2,2) > size(img,2) || MB_window_coord_search_clear(2,2) > size(img,2)
-                MB_window_coord_search(2,2) = size(img,2);
-                MB_window_coord_search_clear(2,2) = size(img,2);
+            if MB_window_coord_search(2,2) > size(PI_img,2) || MB_window_coord_search_clear(2,2) > size(PI_img,2)
+                MB_window_coord_search(2,2) = size(PI_img,2);
+                MB_window_coord_search_clear(2,2) = size(PI_img,2);
                 MB_window_out_of_bounce = 1;
             end
                       
             % Create temp window
-            img_temp_window = img(MB_window_coord_search(1,1):MB_window_coord_search(2,1),MB_window_coord_search(1,2):MB_window_coord_search(2,2));
+            img_temp_window = PI_img(MB_window_coord_search(1,1):MB_window_coord_search(2,1),MB_window_coord_search(1,2):MB_window_coord_search(2,2));
 %             figure(); imagesc(img_temp_window); colormap('gray');%---
             
             % Local thresholding
@@ -227,40 +246,27 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
                 % Features: Area, Eccentricity, Orientation, Perimeter
                 MB_blob_features_bw = regionprops(img_blob_label_window,'Area','Eccentricity','Orientation','Perimeter');     
                 
-                % Updata MB
-                MB(MB_index).old_pos = MB(MB_index).new_pos;
-                MB(MB_index).new_pos = fliplr(round(MB_blob_features.WeightedCentroid)) + [MB_window_coord_search(1,1)-1, MB_window_coord_search(1,2)-1];%[max_y,max_x];
-                MB(MB_index).vel = MB(MB_index).new_pos-MB(MB_index).old_pos;
-                MB(MB_index).max_int = max_int;
-                MB(MB_index).centroid = fliplr(round(MB_blob_features.WeightedCentroid)) + [MB_window_coord_search(1,1)-1, MB_window_coord_search(1,2)-1];
-                MB(MB_index).area = MB_blob_features_bw.Area;
-                MB(MB_index).eccentricity = MB_blob_features_bw.Eccentricity;
-                MB(MB_index).orientation = MB_blob_features_bw.Orientation;
-                MB(MB_index).perimeter = MB_blob_features_bw.Perimeter;
-                MB(MB_index).count = [blob_count_global_window blob_count_window];
-                MB(MB_index).age = MB(MB_index).age + [0 1 1];
-
-                % Updata MB_log
-                MB_log(MB_index).old_pos(MB(MB_index).age(3),:) = MB(MB_index).old_pos;
-                MB_log(MB_index).new_pos(MB(MB_index).age(3),:) = MB(MB_index).new_pos;
-                MB_log(MB_index).vel(MB(MB_index).age(3),:) = MB(MB_index).vel;
-                MB_log(MB_index).max_int(MB(MB_index).age(3)) = MB(MB_index).max_int;
-                MB_log(MB_index).centroid(MB(MB_index).age(3),:) = MB(MB_index).centroid;               
-                MB_log(MB_index).area(MB(MB_index).age(3)) = MB(MB_index).area;
-                MB_log(MB_index).eccentricity(MB(MB_index).age(3)) = MB(MB_index).eccentricity;
-                MB_log(MB_index).orientation(MB(MB_index).age(3)) = MB(MB_index).orientation;
-                MB_log(MB_index).perimeter(MB(MB_index).age(3)) = MB(MB_index).perimeter;              
-                MB_log(MB_index).count(MB(MB_index).age(3),:) = MB(MB_index).count;
-                MB_log(MB_index).age = MB(MB_index).age;
+                % Updata MB log
+                MB_log(MB_idx).age = MB_log(MB_idx).age + [0 1 1];
+                MB_log(MB_idx).state = max_int;
+                MB_log(MB_idx).old_pos(MB_log(MB_idx).age(3),:) = MB_log(MB_idx).new_pos(end,:);
+                MB_log(MB_idx).new_pos(MB_log(MB_idx).age(3),:) = fliplr(round(MB_blob_features.WeightedCentroid)) + [MB_window_coord_search(1,1)-1, MB_window_coord_search(1,2)-1];%[max_y,max_x];
+                MB_log(MB_idx).vel(MB_log(MB_idx).age(3),:) = MB_log(MB_idx).new_pos(end,:)-MB_log(MB_idx).old_pos(end,:);
+                MB_log(MB_idx).max_int(MB_log(MB_idx).age(3)) = max_int;
+                MB_log(MB_idx).centroid(MB_log(MB_idx).age(3),:) = fliplr(round(MB_blob_features.WeightedCentroid)) + [MB_window_coord_search(1,1)-1, MB_window_coord_search(1,2)-1];
+                MB_log(MB_idx).area(MB_log(MB_idx).age(3)) = MB_blob_features_bw.Area;
+                MB_log(MB_idx).eccentricity(MB_log(MB_idx).age(3)) = MB_blob_features_bw.Eccentricity;
+                MB_log(MB_idx).orientation(MB_log(MB_idx).age(3)) = MB_blob_features_bw.Orientation;
+                MB_log(MB_idx).perimeter(MB_log(MB_idx).age(3)) = MB_blob_features_bw.Perimeter;
+                MB_log(MB_idx).count(MB_log(MB_idx).age(3),:) = [blob_count_global_window blob_count_window];
+                
             else
                 % Remove MB from list
-                MB(MB_index).state = 0;
-                MB_log(MB_index).state = 0;
+                MB_log(MB_idx).state = 0;
             end
         else
             % Remove MB from list
-            MB(MB_index).state = 0;
-            MB_log(MB_index).state = 0;
+            MB_log(MB_idx).state = 0;
         end
         % Check next MB from list
     end
@@ -268,7 +274,7 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
     while any(img_global_threshold(:))         
         % Find max intensity and its coordinates
         [max_int, max_index] = max(img_global_threshold(:));
-        [max_y, max_x] = ind2sub(size(img), max_index);
+        [max_y, max_x] = ind2sub(size(PI_img), max_index);
 
         % Update window coordinates
         MB_window_coord_search(1,1) = max_y-MB_window_size_search_localization(1);
@@ -284,8 +290,8 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
             MB_window_out_of_bounce = 1;
         end
         % y_end
-        if MB_window_coord_search(2,1) > size(img,1)
-            MB_window_coord_search(2,1) = size(img,1);
+        if MB_window_coord_search(2,1) > size(PI_img,1)
+            MB_window_coord_search(2,1) = size(PI_img,1);
             MB_window_out_of_bounce = 1;
         end
         % x_start
@@ -294,8 +300,8 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
             MB_window_out_of_bounce = 1;
         end
         % x_end
-        if MB_window_coord_search(2,2) > size(img,2)
-            MB_window_coord_search(2,2) = size(img,2);
+        if MB_window_coord_search(2,2) > size(PI_img,2)
+            MB_window_coord_search(2,2) = size(PI_img,2);
             MB_window_out_of_bounce = 1;
         end
         
@@ -311,20 +317,20 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
             MB_window_coord_search_clear(1,1) = 1;
         end
         % y_end
-        if MB_window_coord_search_clear(2,1) > size(img,1)
-            MB_window_coord_search_clear(2,1) = size(img,1);
+        if MB_window_coord_search_clear(2,1) > size(PI_img,1)
+            MB_window_coord_search_clear(2,1) = size(PI_img,1);
         end
         % x_start
         if MB_window_coord_search_clear(1,2) <= 0
             MB_window_coord_search_clear(1,2) = 1;
         end
         % x_end
-        if MB_window_coord_search_clear(2,2) > size(img,2)
-            MB_window_coord_search_clear(2,2) = size(img,2);
+        if MB_window_coord_search_clear(2,2) > size(PI_img,2)
+            MB_window_coord_search_clear(2,2) = size(PI_img,2);
         end
         
         % Create temp window
-        img_temp_window = img(MB_window_coord_search(1,1):MB_window_coord_search(2,1),MB_window_coord_search(1,2):MB_window_coord_search(2,2));
+        img_temp_window = PI_img(MB_window_coord_search(1,1):MB_window_coord_search(2,1),MB_window_coord_search(1,2):MB_window_coord_search(2,2));
 %         figure(); imagesc(img_temp_window); colormap('gray');%---
         
         % Local thresholding
@@ -364,7 +370,7 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
         % Check for MB_count condition
         if (MB_window_out_of_bounce == 0)% && (blob_count_global_window <= MB_count_condition) && (blob_count_window <= MB_count_condition)
             % Index update
-            MB_index = max([MB_log(:).id]) + 1;
+            MB_idx = max([MB_log(:).id]) + 1;
             
             % Features: MaxIntensity, MeanIntensity, WeigtedCentroid
             MB_blob_features = regionprops(img_blob_label_window, img_temp_window,'MaxIntensity','WeightedCentroid');
@@ -372,112 +378,40 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
             % Features: Area, Eccentricity, Orientation, Perimeter
             MB_blob_features_bw = regionprops(img_blob_label_window,'Area','Eccentricity','Orientation','Perimeter');
             
-            % Updata MB
-            MB(MB_index).state = 1;
-            MB(MB_index).old_pos = [0, 0];
-            MB(MB_index).new_pos = fliplr(round(MB_blob_features.WeightedCentroid)) + [MB_window_coord_search(1,1)-1, MB_window_coord_search(1,2)-1];%[max_y, max_x];
-            MB(MB_index).vel = [0,0];
-            MB(MB_index).id = MB_index;
-            MB(MB_index).max_int = max_int;
-            MB(MB_index).centroid = fliplr(round(MB_blob_features.WeightedCentroid)) + [MB_window_coord_search(1,1)-1, MB_window_coord_search(1,2)-1];
-            MB(MB_index).area = MB_blob_features_bw.Area;
-            MB(MB_index).eccentricity = MB_blob_features_bw.Eccentricity;
-            MB(MB_index).orientation = MB_blob_features_bw.Orientation;
-            MB(MB_index).perimeter = MB_blob_features_bw.Perimeter;
-            MB(MB_index).count = [blob_count_global_window blob_count_window];
-            MB(MB_index).age = [idx_frame idx_frame 1];
-
-            % Updata MB_log
-            MB_log(MB_index).state = 1;
-            MB_log(MB_index).old_pos = MB(MB_index).old_pos;
-            MB_log(MB_index).new_pos = MB(MB_index).new_pos;
-            MB_log(MB_index).vel = MB(MB_index).vel;
-            MB_log(MB_index).id = MB_index;
-            MB_log(MB_index).max_int = MB(MB_index).max_int;
-            MB_log(MB_index).centroid = MB(MB_index).centroid;            
-            MB_log(MB_index).area = MB(MB_index).area;
-            MB_log(MB_index).eccentricity = MB(MB_index).eccentricity;
-            MB_log(MB_index).orientation = MB(MB_index).orientation;
-            MB_log(MB_index).perimeter = MB(MB_index).perimeter;           
-            MB_log(MB_index).count = MB(MB_index).count;
-            MB_log(MB_index).age = MB(MB_index).age;
+            % Updata MB log
+            MB_log(MB_idx).state = max_int;
+            MB_log(MB_idx).old_pos = [0, 0];
+            MB_log(MB_idx).new_pos = fliplr(round(MB_blob_features.WeightedCentroid)) + [MB_window_coord_search(1,1)-1, MB_window_coord_search(1,2)-1];%[max_y, max_x];
+            MB_log(MB_idx).vel = [0,0];
+            MB_log(MB_idx).id = MB_idx;
+            MB_log(MB_idx).max_int = max_int;
+            MB_log(MB_idx).centroid = fliplr(round(MB_blob_features.WeightedCentroid)) + [MB_window_coord_search(1,1)-1, MB_window_coord_search(1,2)-1];
+            MB_log(MB_idx).area = MB_blob_features_bw.Area;
+            MB_log(MB_idx).eccentricity = MB_blob_features_bw.Eccentricity;
+            MB_log(MB_idx).orientation = MB_blob_features_bw.Orientation;
+            MB_log(MB_idx).perimeter = MB_blob_features_bw.Perimeter;
+            MB_log(MB_idx).count = [blob_count_global_window blob_count_window];
+            MB_log(MB_idx).age = [idx_frame idx_frame 1];
         end
     end
 end
 
 % Remove first instances of pos and vel due to startup
-for MB_index = 1:length(MB)
-    MB_log(MB_index).old_pos(1,:) = [];
-    MB_log(MB_index).vel(1,:) = [];
+for MB_idx = 1:length(MB_log)
+    MB_log(MB_idx).old_pos(1,:) = [];
+    MB_log(MB_idx).vel(1,:) = [];
 end
 toc
-%%
 
-%%
-for idx_frame = 26220:26300%4550:4630;%3970:4112
-    v_MB = 0.5*10^(-3);
-    % Load img
-    img = load_img_contrast_temp(idx_frame,idx_comp_sync,n_bck,v_MB,mov_x_comp_contrast,mov_y_comp_contrast);
-    
-%     img = interp2(X,Y,img,Xq,Yq,interpolation_type);
-    %img = img(15:end,:);
-    
-%     %----
-%     n = 20;
-%     %b = fir1(n,[0.1 [0.2 0.9]],'DC-1');
-%     b = fir1(n,[0.08]);
-%     %----
-% 
-%     %----
-%     img = filter(b,1,img,[],1);
-%     img = img(n/2+1:end,:);
-%     %---
+% Save parameters in MB_tracking_parameter
 
-    
-    % Calculate threshold
-    SEM = std(img(:));               
-    ts = tinv(0.9999,length(img(:))-1);     
-    CI = mean(img(:)) + ts*SEM;
-    global_threshold = CI;
-    global_threshold = 0;
-    %img = img(810:845,300:370);
-    img_global_threshold = img;
-    img_global_threshold(img_global_threshold < global_threshold) = 0;
-    
-    pause(0.2)
-    figure(104); imagesc(img_global_threshold); colormap('gray');    
-%     xlabel('Lateral [mm]'); ylabel('Axial [mm]'); 
-    title(['frame' num2str(idx_frame,'%d')]);
-%     set(gca,'Xtick',linspace(0,1189,5)); set(gca, 'XTickLabel',linspace(0,12,5));
-%     set(gca,'Ytick',linspace(0,2489,6)); set(gca, 'YTickLabel',linspace(0,25,6));
-%     set(gca, 'DataAspectRatio',[1 1 1]) % set data aspect ratio in zoom box
-%     set(gca, 'PlotBoxAspectRatio',[1 1 1])
-    
-%     norm = max(img_avg(:));
-%     limg_avg = 20*log10(img_avg/norm);
-%     figure(); imagesc(limg_avg,[-40 0]); colormap(gray);
+%MB_tracking_parameter.MB_log = MB_log;
 
-% v_MB = 0.1*10^(-3);  
-% % Load img
-%     img = load_img_contrast(idx_frame,idx_comp_sync,n_bck,n_bck_grnd_skip,v_MB,mov_x_comp_contrast,mov_y_comp_contrast);
-%     
-%     % Calculate threshold
-%     SEM = std(img(:));               
-%     ts = tinv(0.9999,length(img(:))-1);     
-%     CI = mean(img(:)) + ts*SEM;
-%     global_threshold = CI;
-%     
-%     img_global_threshold = img;
-%     img_global_threshold(img_global_threshold < global_threshold) = 0;
-%     
-%     pause(0.2)
-%     figure(105); imagesc(img_global_threshold); colormap('gray');    
-%     title(['frame' num2str(idx_frame,'%d')]);
-end
+
 
 %% Find MB from coordinates
 MB_index_valid = [];
-coord = [259 162];
+coord = [365 989];
 for i = 1:size(MB_index_filter_age,2)
     for j = 1:size(MB_log(MB_index_filter_age(i)).centroid,1)
         if MB_log(MB_index_filter_age(i)).centroid(j,1) == coord(2) && MB_log(MB_index_filter_age(i)).centroid(j,2) == coord(1); 
@@ -503,7 +437,7 @@ for i = 1:size(MB_index_valid,2)
     %figure(); plot(linspace(0,fps/2,round(size(temp_x_fft,1)/2)),abs(temp_x_fft(1:round(size(temp_x_fft,1)/2)))); legend('1','2','3','4','5','6','7');  xlabel('Frequency (Hz)'); ylabel('Magnitude'); % title('Frequency spectrum of axial displacement');
 end
 %% Axial
-MB_index_valid = MB_index_filter_age;
+MB_index_valid = MB_index_filter_dir;
 age_max = 0;
 age_min = MB_log(MB_index_valid(1)).age(1);
 for i = 1:size(MB_index_valid,2)
@@ -560,50 +494,71 @@ lateral_mov = sum(lateral_mov)./temp_age;
 lateral_mov_fft = fft(lateral_mov);
 figure(); plot(abs(lateral_mov_fft));
 
-%%
-outputVideo=VideoWriter('contrast_video_clean_log_35');
-outputVideo.FrameRate=2;
+
+
+%% 
+
+
+figure();
+% subplot(1,2,1)
+PI_img = load_img(518, img_type, folderName, img_resolution, area_of_interest);
+imagesc(lateral_axis*1000,depth_axis*1000,log_compression(abs(PI_img)),[-30 0])
+xlabel('lateral [mm]')
+ylabel('depth [mm]')
+axis image
+colormap(gray(255))
+
+subplot(1,2,2)
+PI_img = load_img(518);
+imagesc(lateral_axis*1000,depth_axis*1000,log_compression(abs(PI_img)),[-30 0])
+xlabel('lateral [mm]')
+ylabel('depth [mm]')
+axis image
+colormap(gray(255))
+
+%% Make video
+% Set image axis:
+figure(3); 
+PI_img = load_img(12000);
+
+
+outputVideo=VideoWriter('test5_vid');
+outputVideo.FrameRate=3;
 open(outputVideo);
 mov(1:50)= struct('cdata',[],'colormap',[]);
-pause(0.3)    
-for idx_frame = 7550:7630
+pause(0.3)
+frame_timestamp_linecount = [];
+idx = 0;
+for idx_frame = 500:700
     
-     % Load img
-    img = load_img_contrast(idx_frame,idx_comp_sync,n_bck,n_bck_grnd_skip,v_MB,mov_x_comp_contrast,mov_y_comp_contrast);
-%    img = abs(interp2(X,Y,img,Xq,Yq,interpolation_type));
-    %img = img(15:end,:);
+    idx = idx + 1;
+    [PI_img, time_stamp, line_count] = load_img(idx_frame, img_type, folderName, img_resolution, area_of_interest);
+    frame_timestamp_linecount(idx,:) = [time_stamp, line_count, idx_frame];
+    if idx>1
+        1/(diff(frame_timestamp_linecount(idx-1:idx,1),1,1)*1e-6)
+    end
     
-%     % Calculate threshold
-%     SEM = std(img(:));               
-%     ts = tinv(0.9999999999,length(img(:))-1);     
-%     CI = mean(img(:)) + ts*SEM;
-%     global_threshold = CI;
+    figure(3);
+    imagesc(lateral_axis*1000,depth_axis*1000,log_compression(abs(PI_img)),[-30 0])
+%      imagesc(lateral_axis*1000,depth_axis*1000,abs(PI_img),[100 400])
+%      imagesc(abs(PI_img),[100 400])
     
-%     img_global_threshold = img;
-%     img_global_threshold(img_global_threshold < global_threshold) = 0;
-    
-    %img = load_img_contrast(idx_frame,idx_comp_sync,n_bck_grnd,n_bck_grnd_skip,v_MB,mov_x_comp_contrast,mov_y_comp_contrast);
-    pause(0.3)
-%     figure(4); plot(img);
-%     ylim([0 100]);
-    figure(2); imagesc(20*log10(img/max(img(:))), [-35 0]); colormap('gray');
-%     figure(2); imagesc(img_global_threshold); colormap('gray');    
-    xlabel('Lateral [mm]'); ylabel('Axial [mm]'); % title('Micro-Bubble image');
-    set(gca,'Xtick',linspace(0,size(img,2),5)); set(gca, 'XTickLabel',linspace(0,12,5));
-    set(gca,'Ytick',linspace(0,size(img,1),6)); set(gca, 'YTickLabel',linspace(0,25,6));
-    set(gca, 'DataAspectRatio',[1 4 1]) % set data aspect ratio in zoom box
-    set(gca, 'PlotBoxAspectRatio',[1 1 1])
-    
+    xlabel('lateral [mm]')
+    ylabel('depth [mm]')
+    axis image
+    colormap(gray(255))
+    pause(0.1)
     mov=getframe(gcf);
     writeVideo(outputVideo,mov.cdata);
-
-    
-    
-%     norm = max(img_avg(:));
-%     limg_avg = 20*log10(img_avg/norm);
-%     figure(); imagesc(limg_avg,[-40 0]); colormap(gray);
 end
 close(gcf)
 close(outputVideo);
+
+framerate = 1./(diff(frame_timestamp_linecount(:,1),1,1)*1e-6);
+figure(2);plot(framerate)
+
+
+
+
 
 
