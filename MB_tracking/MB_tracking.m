@@ -2,6 +2,9 @@ log_compression = @(x) 20*log10(x/max(x(:)));
 
 % Folder path to data 
 folderName = '/data/cfudata3/ramosh/cavh/microbubble-experiments/Part6-PM_Half_Front_10V_6_5MHz_2Beam1Line_Flow_Ramp_5uls_to_0uls_180s_1to100';
+% folderName = '/data/cfudata3/ramosh/cavh/microbubble-experiments/twochannel_5ul_sec';
+
+
 
 %% Read usecase
 usecase_xml = xmlread([folderName '/usecase.xml']);
@@ -26,6 +29,7 @@ stop_depth = str2double(temp.item(0).getFirstChild.getData);
 % read wave sample to calculate center_frequency
 Tx_transmit_rate = 120e6;
 pulse_per_wawe = 1.5;
+temp = usecase_xml.getElementsByTagName('sampleCount');
 center_frequency = (str2double(temp.item(0).getFirstChild.getData)/(Tx_transmit_rate*pulse_per_wawe))^(-1);
 
 %% Image parameters
@@ -36,6 +40,16 @@ area_of_interest.axial_end= 1250;
 area_of_interest.lateral_init= 1; 
 area_of_interest.lateral_end= 60; 
 
+% area_of_interest.axial_init= 775; 
+% area_of_interest.axial_end= 950; 
+% area_of_interest.lateral_init= 1; 
+% area_of_interest.lateral_end= 60; 
+
+% area_of_interest.axial_init= 700; 
+% area_of_interest.axial_end= 1000; 
+% area_of_interest.lateral_init= 1; 
+% area_of_interest.lateral_end= 60; 
+
 % Wanted resolution
 img_resolution.axial_new = 10e-6;
 img_resolution.lateral_new = 10e-6;
@@ -43,21 +57,29 @@ img_resolution.lateral_new = 10e-6;
 img_type = 'PI';
 
 
+%% Calculate frame rate
+[~, t1_temp, ~] = load_img(1, img_type, folderName, img_resolution, area_of_interest);
+[~, t2_temp, ~] = load_img(2, img_type, folderName, img_resolution, area_of_interest);
+fps = 1/(t2_temp/(1e6)-t1_temp/(1e6));
+
+%% Get img size
+
+img_size = size(load_img(1, img_type, folderName, img_resolution, area_of_interest));
 
 %% Tracking parameters
 % Tracking parameters
 MB_window_coord_search = zeros(2,2); % Coordinates for search window
 MB_window_coord_search_clear = zeros(2,2); % Coordinates for search clear window
 
-MB_window_size_search_localization = [30 30]; % [y,x] Search window for localization of PSF's
+MB_window_size_search_localization = [25 25]; % [y,x] Search window for localization of PSF's
 MB_window_size_search_new = [20 20]; % [y,x] Search window for new MB's
-MB_window_size_search_existing = [20 20]; % [y,x] Search window for ''old'' MB's
-MB_window_size_search_clear = [20 40]; % [y,x] Search window for ''old'' MB's
+MB_window_size_search_existing = [15 15]; % [y,x] Search window for ''old'' MB's
+MB_window_size_search_clear = [30 30]; % [y,x] Search window for ''old'' MB's
 MB_window_threshold = 1.3; % Window Threshold (actual MB_window_threshold = Max_intensity*1/threshold)
 
 
 idx_frame_start = 500;
-nframe = 100;
+n_frame = 15000;
 
 % initializing MB struct
 
@@ -65,6 +87,7 @@ MB_log = []; % Current MB
 MB_log.state = 0;
 MB_log.old_pos = zeros(1,2);
 MB_log.new_pos = zeros(1,2);
+MB_log.pred_pos = zeros(1,2);
 MB_log.vel = zeros(1,2); 
 MB_log.max_int = 0;
 MB_log.centroid = zeros(1,2);
@@ -80,7 +103,7 @@ MB_idx = 0; % Index for each MB
 MB_window_out_of_bounce_flag = 0; % Checks if search windows is outside image
 
 tic
-for idx_frame=idx_frame_start:idx_frame_start+nframe
+for idx_frame=idx_frame_start:idx_frame_start+n_frame
     idx_frame
     
     % Load img
@@ -120,10 +143,10 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
             MB_window_coord_search(1,2) = MB_pos_x-MB_window_size_search_new(2);
             MB_window_coord_search(2,2) = MB_pos_x+MB_window_size_search_new(2);
         else
-            MB_window_coord_search(1,1) = MB_pos_y-MB_window_size_search_existing(1)+MB(MB_index).vel(1);
-            MB_window_coord_search(2,1) = MB_pos_y+MB_window_size_search_existing(1)+MB(MB_index).vel(1);
-            MB_window_coord_search(1,2) = MB_pos_x-MB_window_size_search_existing(2)+MB(MB_index).vel(2);
-            MB_window_coord_search(2,2) = MB_pos_x+MB_window_size_search_existing(2)+MB(MB_index).vel(2);
+            MB_window_coord_search(1,1) = MB_pos_y-MB_window_size_search_existing(1)+MB_log(MB_idx).vel(1);
+            MB_window_coord_search(2,1) = MB_pos_y+MB_window_size_search_existing(1)+MB_log(MB_idx).vel(1);
+            MB_window_coord_search(1,2) = MB_pos_x-MB_window_size_search_existing(2)+MB_log(MB_idx).vel(2);
+            MB_window_coord_search(2,2) = MB_pos_x+MB_window_size_search_existing(2)+MB_log(MB_idx).vel(2);
         end
         
         % Check for out of bounce
@@ -205,6 +228,14 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
             img_temp_window = PI_img(MB_window_coord_search(1,1):MB_window_coord_search(2,1),MB_window_coord_search(1,2):MB_window_coord_search(2,2));
 %             figure(); imagesc(img_temp_window); colormap('gray');%---
             
+%------------------------------------------------
+            % Load img
+%             temp_PI_img = load_img(idx_frame-1, img_type, folderName, img_resolution, area_of_interest);
+%             temp_img_temp_window = temp_PI_img(MB_window_coord_search(1,1):MB_window_coord_search(2,1),MB_window_coord_search(1,2):MB_window_coord_search(2,2));
+%             figure(); imagesc(temp_img_temp_window); colormap('gray');%---
+%-------------------------------------------------
+
+
             % Local thresholding
             img_temp_window(find(img_temp_window < max_int/MB_window_threshold | img_temp_window > max_int)) = 0;
 %             figure(); imagesc(img_temp_window); colormap('gray');%---
@@ -250,7 +281,8 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
                 MB_log(MB_idx).age = MB_log(MB_idx).age + [0 1 1];
                 MB_log(MB_idx).state = max_int;
                 MB_log(MB_idx).old_pos(MB_log(MB_idx).age(3),:) = MB_log(MB_idx).new_pos(end,:);
-                MB_log(MB_idx).new_pos(MB_log(MB_idx).age(3),:) = fliplr(round(MB_blob_features.WeightedCentroid)) + [MB_window_coord_search(1,1)-1, MB_window_coord_search(1,2)-1];%[max_y,max_x];
+                MB_log(MB_idx).new_pos(MB_log(MB_idx).age(3),:) = fliplr(round(MB_blob_features.WeightedCentroid)) + [MB_window_coord_search(1,1)-1, MB_window_coord_search(1,2)-1]; %[max_y,max_x];
+                MB_log(MB_idx).pred_pos(MB_log(MB_idx).age(3),:) = [MB_pos_y+MB_log(MB_idx).vel(1),MB_pos_x+MB_log(MB_idx).vel(2);];
                 MB_log(MB_idx).vel(MB_log(MB_idx).age(3),:) = MB_log(MB_idx).new_pos(end,:)-MB_log(MB_idx).old_pos(end,:);
                 MB_log(MB_idx).max_int(MB_log(MB_idx).age(3)) = max_int;
                 MB_log(MB_idx).centroid(MB_log(MB_idx).age(3),:) = fliplr(round(MB_blob_features.WeightedCentroid)) + [MB_window_coord_search(1,1)-1, MB_window_coord_search(1,2)-1];
@@ -382,6 +414,7 @@ for idx_frame=idx_frame_start:idx_frame_start+nframe
             MB_log(MB_idx).state = max_int;
             MB_log(MB_idx).old_pos = [0, 0];
             MB_log(MB_idx).new_pos = fliplr(round(MB_blob_features.WeightedCentroid)) + [MB_window_coord_search(1,1)-1, MB_window_coord_search(1,2)-1];%[max_y, max_x];
+            MB_log(MB_idx).pred_pos = [0,0];
             MB_log(MB_idx).vel = [0,0];
             MB_log(MB_idx).id = MB_idx;
             MB_log(MB_idx).max_int = max_int;
@@ -401,6 +434,32 @@ for MB_idx = 1:length(MB_log)
     MB_log(MB_idx).old_pos(1,:) = [];
     MB_log(MB_idx).vel(1,:) = [];
 end
+
+% Save all parameters
+MB_data.folderName = folderName;
+MB_data.MB_log = MB_log;
+MB_data.samplingRate = sampling_rate;
+MB_data.startLine = start_line;
+MB_data.endLine = end_line;
+MB_data.elementPitch = element_pitch;
+MB_data.lineDensity = line_density;
+MB_data.stopDepth = stop_depth;
+MB_data.txTransmitFrequency = Tx_transmit_rate;
+MB_data.centerFrequency = center_frequency;
+MB_data.fps = fps;
+MB_data.imgResolution = img_resolution;
+MB_data.imgSize = img_size;
+MB_data.imgType = img_type;
+MB_data.areaOfInterest = area_of_interest;
+MB_data.MB_window_size_search_localization = MB_window_size_search_localization;
+MB_data.MB_window_size_search_new = MB_window_size_search_new;
+MB_data.MB_window_size_search_existing = MB_window_size_search_existing;
+MB_data.MB_window_size_search_clear = MB_window_size_search_clear;
+MB_data.MB_window_threshold = MB_window_threshold;
+MB_data.startFrame = idx_frame_start;
+MB_data.numberOfFrames = n_frame;
+
+
 toc
 
 % Save parameters in MB_tracking_parameter
@@ -501,7 +560,7 @@ figure(); plot(abs(lateral_mov_fft));
 
 figure();
 % subplot(1,2,1)
-PI_img = load_img(518, img_type, folderName, img_resolution, area_of_interest);
+PI_img = load_img(5000, img_type, folderName, img_resolution, area_of_interest);
 imagesc(lateral_axis*1000,depth_axis*1000,log_compression(abs(PI_img)),[-30 0])
 xlabel('lateral [mm]')
 ylabel('depth [mm]')
@@ -518,8 +577,8 @@ colormap(gray(255))
 
 %% Make video
 % Set image axis:
-figure(3); 
-PI_img = load_img(12000);
+figure(7); 
+PI_img = load_img(5000, img_type, folderName, img_resolution, area_of_interest);;
 
 
 outputVideo=VideoWriter('test5_vid');
@@ -529,17 +588,21 @@ mov(1:50)= struct('cdata',[],'colormap',[]);
 pause(0.3)
 frame_timestamp_linecount = [];
 idx = 0;
-for idx_frame = 500:700
-    
+img_type = 'PI'
+for idx_frame = 15000:22000
+    idx_frame
     idx = idx + 1;
     [PI_img, time_stamp, line_count] = load_img(idx_frame, img_type, folderName, img_resolution, area_of_interest);
+%     imagesc(log_compression(abs(PI_img)),[-60 0])
     frame_timestamp_linecount(idx,:) = [time_stamp, line_count, idx_frame];
     if idx>1
-        1/(diff(frame_timestamp_linecount(idx-1:idx,1),1,1)*1e-6)
+        1/(diff(frame_timestamp_linecount(idx-1:idx,1),1,1)*1e-6);
     end
     
-    figure(3);
-    imagesc(lateral_axis*1000,depth_axis*1000,log_compression(abs(PI_img)),[-30 0])
+    figure(7);
+    imagesc(lateral_axis*1000,depth_axis*1000,log_compression(abs(PI_img)),[-20 0])
+%     imagesc(lateral_axis*1000,depth_axis*1000,abs(PI_img),[0 2000])
+    
 %      imagesc(lateral_axis*1000,depth_axis*1000,abs(PI_img),[100 400])
 %      imagesc(abs(PI_img),[100 400])
     

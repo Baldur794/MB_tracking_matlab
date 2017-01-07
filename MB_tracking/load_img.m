@@ -30,13 +30,8 @@ img_resolution.lateral_original = element_pitch/line_density;
 
 % To obtain wanted resolution
 interpolate_flag = true;
-if interpolate_flag
-    interpolation_factor.axial = img_resolution.axial_original/img_resolution.axial_new;
-    interpolation_factor.lateral = img_resolution.lateral_original/img_resolution.lateral_new;
-else
-    interpolation_factor_axial = 1;
-    interpolation_factor_lateral = 1;
-end
+interpolation_factor.axial = img_resolution.axial_original/img_resolution.axial_new;
+interpolation_factor.lateral = img_resolution.lateral_original/img_resolution.lateral_new;
 interpolation_type = 'spline'; % Interpolation method
 
 % Grid for interpolation
@@ -44,13 +39,14 @@ interpolation_type = 'spline'; % Interpolation method
 [Xq,Yq] = meshgrid(area_of_interest.lateral_init:1/interpolation_factor.lateral:area_of_interest.lateral_end,area_of_interest.axial_init:1/interpolation_factor.axial:area_of_interest.axial_end);
 
 % Filter parameters
-n_bck_grnd_skip = 100; % Distance between frame in interest and bck image
-n_bck_jump = 20; % Number of frames between each img used for final bck image
-n_bck = 5; % Number of imgs used for bck image
+env_detect_before_mean_flag = false;
+n_bck_grnd_skip = 100; %0 100 Distance between frame in interest and bck image
+n_bck_jump = 20; %1 20 Number of frames between each img used for final bck image
+n_bck = 5; %10 5 Number of imgs used for bck image
 n_fore = 1; % Number of imgs used for fore image
 
 % Bandpass filter in RF domain
-bpf.filt_order=100;            % Order of filter
+bpf.filt_order=50;            % Order of filter
 bpf.cuttoff1= 2e6;             % Lower cutoff MHz
 bpf.cuttoff2= 18e6;            % Upper cutoff MHz
 bpf.filter = designfilt('bandpassfir', 'FilterOrder', bpf.filt_order, 'CutoffFrequency1', bpf.cuttoff1, 'CutoffFrequency2', bpf.cuttoff2, 'SampleRate', sampling_rate);
@@ -60,7 +56,7 @@ if strcmp('PI',img_type) % For PI image
     select_img = [1 2];
     
     % % Background img
-    bck_grnd_img = zeros(size(Xq));
+    bck_grnd_img = zeros(size(X));
     
     if n_bck > 0
         % sum of n_bck_grnd images
@@ -72,19 +68,22 @@ if strcmp('PI',img_type) % For PI image
             for it_stream=1:2
                 [header temp]=bkmload([folderName filesep streamName{select_img(it_stream)}],it_frame);
                 temp_data{it_stream} = hilbert(double(temp(area_of_interest.axial_init:area_of_interest.axial_end,area_of_interest.lateral_init:area_of_interest.lateral_end)));
-                temp_data{it_stream} = filtfilt(bpf.filter,temp_data{it_stream});
+%                 temp_data{it_stream} = filtfilt(bpf.filter,temp_data{it_stream});
             end
-            PI_img_bck = abs(temp_data{select_img(1)}+temp_data{select_img(2)});
-            PI_img_bck = interp2(X,Y,PI_img_bck,Xq,Yq,interpolation_type);
-            
+            if env_detect_before_mean_flag
+                PI_img_bck = abs(temp_data{select_img(1)}+temp_data{select_img(2)});
+            else
+                PI_img_bck = temp_data{select_img(1)}+temp_data{select_img(2)};
+            end
             bck_grnd_img = bck_grnd_img + PI_img_bck;
+%             PI_img_bck = interp2(X,Y,PI_img_bck,Xq,Yq,interpolation_type);
         end
         % background average
         bck_grnd_img = bck_grnd_img/n_bck;
     end
     
     % Foreground img
-    fore_grnd_img = zeros(size(Xq));
+    fore_grnd_img = zeros(size(X));
     
     % Sum of n_fore images
     for it_frame = idx_frame-n_fore+1:idx_frame
@@ -95,26 +94,42 @@ if strcmp('PI',img_type) % For PI image
         for it_stream=1:2
             [header temp]=bkmload([folderName filesep streamName{select_img(it_stream)}],it_frame);
             temp_data{it_stream} = hilbert(double(temp(area_of_interest.axial_init:area_of_interest.axial_end,area_of_interest.lateral_init:area_of_interest.lateral_end)));
-            temp_data{it_stream} = filtfilt(bpf.filter,temp_data{it_stream});
+%             temp_data{it_stream} = filtfilt(bpf.filter,temp_data{it_stream});
             new_line_count(1,it_stream)=header.lineCount;
         end
-        PI_img_fore = abs(temp_data{select_img(1)}+temp_data{select_img(2)});
-        PI_img_fore = interp2(X,Y,PI_img_fore,Xq,Yq,interpolation_type);
-        new_time_stamp=header.timeStamp;
-        
+        if env_detect_before_mean_flag
+            PI_img_fore = abs(temp_data{select_img(1)}+temp_data{select_img(2)});
+        else
+            PI_img_fore = temp_data{select_img(1)}+temp_data{select_img(2)};
+        end
         fore_grnd_img = fore_grnd_img + PI_img_fore;
+        new_time_stamp=header.timeStamp; 
+%         PI_img_fore = interp2(X,Y,PI_img_fore,Xq,Yq,interpolation_type);              
     end
     % Average by n_fore
     fore_grnd_img = fore_grnd_img/n_fore;
     
+    
     % Remove background
     img = fore_grnd_img-bck_grnd_img;
-    % Output img
-    img = img.*(img >= 0);
+    
+    if env_detect_before_mean_flag
+        img = img.*(img >= 0);
+    else
+        img = abs(img);
+    end
+    
+    % Interpolate
+    if interpolate_flag
+        img = interp2(X,Y,img,Xq,Yq,interpolation_type);
+    end
 
 elseif strcmp('B-mode',img_type) % For B-mode
     % Choose which images to use for B-mode
     select_img = [1];
+    
+    % Foreground img
+    fore_grnd_img = zeros(size(X));
     
     % Sum of n_fore images
     for it_frame = idx_frame-n_fore+1:idx_frame
@@ -127,8 +142,11 @@ elseif strcmp('B-mode',img_type) % For B-mode
         temp_data = filtfilt(bpf.filter,temp_data);
         new_line_count = header.lineCount;
 
-        B_img_fore = abs(temp_data{select_img(1)});
-        B_img_fore = interp2(X,Y,B_img_fore,Xq,Yq,interpolation_type);
+        if env_detect_before_mean_flag
+            B_img_fore = abs(temp_data);
+        else
+            B_img_fore = temp_data;
+        end
         new_time_stamp=header.timeStamp;
         
         fore_grnd_img = fore_grnd_img + B_img_fore;
@@ -136,9 +154,16 @@ elseif strcmp('B-mode',img_type) % For B-mode
     % Average by n_fore
     fore_grnd_img = fore_grnd_img/n_fore;
     
-    % Output img
     img = fore_grnd_img;
-
+    
+    if ~env_detect_before_mean_flag
+        img = abs(img);
+    end
+    
+    % Interpolate
+    if interpolate_flag
+        img = interp2(X,Y,img,Xq,Yq,interpolation_type);
+    end    
 else
     erf('Not valid image type');
 end
