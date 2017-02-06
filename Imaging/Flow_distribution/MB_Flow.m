@@ -1,3 +1,11 @@
+for i = 1;%240:100:740
+% Use only MBs within min max xy
+
+box_coord_condition_flag = true;
+% box_coord_condition = [115, 150, i, i+100]; % [y1, y2, x1, x2]
+box_coord_condition = [90 110 190 230]; % [y1, y2, x1, x2] 
+MB_box_coord = []; % Filtered list of MBs satisfying conditions
+
 %% Parameters
 % Convert from pixel to vel in mm/s
 
@@ -5,13 +13,14 @@ img_resolution = MB_data.imgResolution;
 fps = MB_data.fps;
 
 pos_factor_to_mm = img_resolution.lateral_new*1e3;
+pos_factor_to_um = img_resolution.lateral_new*1e5;
 vel_factor_to_mm = img_resolution.lateral_new*fps*1e3;
 
 
 % Min distance from regression line
 max_distance = 25;
-max_velocity = round(51/vel_factor_to_mm); 
-p_fit_order_distance = 2;
+max_velocity = round(100/vel_factor_to_mm); 
+p_fit_order_distance = 1;
 p_fit_order_velocity = 3;
 p_fit_points = 3000;
 
@@ -23,14 +32,20 @@ MB_vel_x = [];
 MB_vel_y = [];
 for i = 1:size(MB_index_list ,2)
     MB_index = MB_index_list(i);
-    MB_pos_x = [MB_pos_x; MB_log(MB_index).old_pos(:,2)];
-    MB_pos_y = [MB_pos_y; MB_log(MB_index).old_pos(:,1)];
-    MB_vel_x = [MB_vel_x; MB_log(MB_index).vel(:,2)];
-    MB_vel_y = [MB_vel_y; MB_log(MB_index).vel(:,1)];
+    MB_pos_x = [MB_pos_x; MB_log_copy(MB_index).old_pos(:,2)];
+    MB_pos_y = [MB_pos_y; MB_log_copy(MB_index).old_pos(:,1)];
+    MB_vel_x = [MB_vel_x; MB_log_copy(MB_index).vel(:,2)];
+    MB_vel_y = [MB_vel_y; MB_log_copy(MB_index).vel(:,1)];
 end
+% Use only MBs inside defined box
+MB_idx = find((MB_pos_y > box_coord_condition(1)) & (MB_pos_y < box_coord_condition(2)) & (MB_pos_x > box_coord_condition(3)) & (MB_pos_x < box_coord_condition(4)));
+MB_pos_x = MB_pos_x(MB_idx);
+MB_vel_x = MB_vel_x(MB_idx);
+MB_pos_y = MB_pos_y(MB_idx);
+MB_vel_y = MB_vel_y(MB_idx);
+
 % Calculate absolute velocity
 MB_vel_abs = sqrt(MB_vel_x.^2+MB_vel_y.^2);
-
 
 
 
@@ -73,9 +88,9 @@ x_fit = linspace(min(MB_pos_x),max(MB_pos_x),p_fit_points);
 y_fit = polyval(p_fit,x_fit);
 
 %% Plot regrssion line
-% figure();
+figure(2);
 hold on;
-plot(x_fit,y_fit,'--','Linewidth',2);
+plot(x_fit,y_fit,'--','Linewidth',3);
 % xlabel('Lateral [mm]'); ylabel('Axial [mm]'); % title('Micro-Bubble image');
 % set(gca,'Xtick',linspace(0,size(lateral_axis,2),6)); set(gca, 'XTickLabel',linspace(round(lateral_axis(1)*1000),round(lateral_axis(end)*1000),6));
 % set(gca,'Ytick',linspace(0,size(depth_axis,2),6)); set(gca, 'YTickLabel',linspace(round(depth_axis(1)*1000),round(depth_axis(end)*1000),6));
@@ -108,9 +123,9 @@ for i = 1:size(dist_list_new,1)
         end
 end
 
-figure, hist(dist_list_new,15);
-xlabel('Distance from centrum [mm]'); ylabel('Frequency');
-set(gca,'Xtick',linspace(-max(abs(dist_list_new)),max(abs(dist_list_new)),5)); set(gca, 'XTickLabel',round(linspace(-max(abs(dist_list_new))*pos_factor_to_mm,max(abs(dist_list_new))*pos_factor_to_mm,5),2));
+figure, hist(dist_list_new,40);
+xlabel('Distance from centrum [um]'); ylabel('Frequency');
+set(gca,'Xtick',linspace(-max(abs(dist_list_new)),max(abs(dist_list_new)),5)); set(gca, 'XTickLabel',round(linspace(-max(abs(dist_list_new))*pos_factor_to_um,max(abs(dist_list_new))*pos_factor_to_um,5),0));
 % set(gca,'Ytick',linspace(0,max(MB_vel_abs),5)); set(gca, 'YTickLabel',round(linspace(0,max(MB_vel_abs)*vel_factor_to_mm,5),2));
 xlim([-max(abs(dist_list_new)) max(abs(dist_list_new))]);
 
@@ -128,7 +143,8 @@ set(gca,'Ytick',linspace(0,max(MB_vel_abs),5)); set(gca, 'YTickLabel',round(lins
 hold on
 plot(x_fit_vel,y_fit_vel,'-r','LineWidth',3);
 xlim([-max(abs(dist_list_new)) max(abs(dist_list_new))]);
-ylim([0,max_velocity])
+ylim([10,max_velocity])
+
 %%
 % figure;
 % hist3([dist_list_new MB_vel_abs],[10,10]);
@@ -148,11 +164,18 @@ y_grid = linspace(min(c{2}),max(c{2}),n_interp); %interp1(c{2},c{2},linspace(min
 z_grid = interp2(X,Y,n,Xq,Yq,'spline');
 figure();
 surf(x_grid, y_grid, z_grid,'EdgeColor','none');
-xlabel('Distance from centrum [mm]'); ylabel('Velocity [mm/s]'); zlabel('Frequency');
-set(gca,'Xtick',linspace(-max(abs(dist_list_new)),max(abs(dist_list_new)),5)); set(gca, 'XTickLabel',round(linspace(-max(abs(dist_list_new))*pos_factor_to_mm,max(abs(dist_list_new))*pos_factor_to_mm,5),2));
-set(gca,'Ytick',linspace(0,max(MB_vel_abs),5)); set(gca, 'YTickLabel',round(linspace(0,max(MB_vel_abs)*vel_factor_to_mm,5),2));
-xlim([min(x_grid) max(x_grid)]);
-ylim([min(y_grid) max(y_grid)]);
+colormap(hot);
+xlabel('Distance from centrum [um]'); ylabel('Velocity [mm/s]'); zlabel('Frequency');
+% set(gca,'Xtick',linspace(-max(abs(dist_list_new)),max(abs(dist_list_new)),5)); set(gca, 'XTickLabel',round(linspace(-max(abs(dist_list_new))*pos_factor_to_mm,max(abs(dist_list_new))*pos_factor_to_mm,5),2));
+% set(gca,'Ytick',linspace(0,max(MB_vel_abs),5)); set(gca, 'YTickLabel',round(linspace(0,max(MB_vel_abs)*vel_factor_to_mm,5),2));
+% xlim([min(x_grid) max(x_grid)]);
+% ylim([min(y_grid) max(y_grid)]);
+set(gca,'Xtick',linspace(-10,10,5)); set(gca, 'XTickLabel',round(linspace(-100,100,5),2));
+set(gca,'Ytick',linspace(0,70/vel_factor_to_mm,8)); set(gca, 'YTickLabel',round(linspace(0,70,8),2));
+% xlim([min(x_grid) max(x_grid)]);
+% ylim([min(y_grid) max(y_grid)]);
+xlim([-10 10]);
+ylim([10/vel_factor_to_mm 70/vel_factor_to_mm]);
 zlim([min(min(z_grid)) max(max(z_grid))]);
 
 p_fit_vel = polyfit(dist_list_new,MB_vel_abs,p_fit_order_velocity);
@@ -167,9 +190,9 @@ end
 z_fit_vel = z_grid( sub2ind(size(z_grid), y_idx, x_idx));
 % figure();
 hold on
-plot3(x_fit_vel(x_idx),y_grid(y_idx),z_fit_vel,'--','color','r');
+plot3(x_fit_vel(x_idx),y_grid(y_idx),z_fit_vel,'--','color','b','LineWidth',2);
 
-
+end
 %% Surf plot
 
 [n,c] = hist3([MB_pos_x MB_pos_y],[10,10]);

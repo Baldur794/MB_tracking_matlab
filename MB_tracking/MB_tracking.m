@@ -1,8 +1,8 @@
 log_compression = @(x) 20*log10(x/max(x(:)));
 
 % Folder path to data 
-folderName = '/data/cfudata3/ramosh/cavh/microbubble-experiments/Part6-PM_Half_Front_10V_6_5MHz_2Beam1Line_Flow_Ramp_5uls_to_0uls_180s_1to100';
-% folderName = '/data/cfudata3/ramosh/cavh/microbubble-experiments/twochannel_5ul_sec';
+% folderName = '/data/cfudata3/ramosh/cavh/microbubble-experiments/Part6-PM_Half_Front_10V_6_5MHz_2Beam1Line_Flow_Ramp_5uls_to_0uls_180s_1to100';
+folderName = '/data/cfudata3/ramosh/cavh/microbubble-experiments/twochannel_5ul_sec';
 
 
 
@@ -34,11 +34,11 @@ center_frequency = (str2double(temp.item(0).getFirstChild.getData)/(Tx_transmit_
 
 %% Image parameters
 
-% Area of interst
-area_of_interest.axial_init= 950; 
-area_of_interest.axial_end= 1250; 
-area_of_interest.lateral_init= 1; 
-area_of_interest.lateral_end= 60; 
+% Area of interst (original resolution)
+% area_of_interest.axial_init= 950; 
+% area_of_interest.axial_end= 1250; 
+% area_of_interest.lateral_init= 1; 
+% area_of_interest.lateral_end= 60; 
 
 % area_of_interest.axial_init= 775; 
 % area_of_interest.axial_end= 950; 
@@ -49,6 +49,11 @@ area_of_interest.lateral_end= 60;
 % area_of_interest.axial_end= 1000; 
 % area_of_interest.lateral_init= 1; 
 % area_of_interest.lateral_end= 60; 
+
+area_of_interest.axial_init= 780; 
+area_of_interest.axial_end= 940; 
+area_of_interest.lateral_init= 1; 
+area_of_interest.lateral_end= 60; 
 
 % Wanted resolution
 img_resolution.axial_new = 10e-6;
@@ -72,19 +77,19 @@ MB_window_coord_search = zeros(2,2); % Coordinates for search window
 MB_window_coord_search_clear = zeros(2,2); % Coordinates for search clear window
 
 MB_window_size_search_localization = [25 25]; % [y,x] Search window for localization of PSF's
-MB_window_size_search_new = [20 20]; % [y,x] Search window for new MB's
-MB_window_size_search_existing = [15 15]; % [y,x] Search window for ''old'' MB's
+MB_window_size_search_new = [80 80];%[20 20]; % [y,x] Search window for new MB's
+MB_window_size_search_existing = [20 20]; % [y,x] Search window for ''old'' MB's
 MB_window_size_search_clear = [30 30]; % [y,x] Search window for ''old'' MB's
 MB_window_threshold = 1.3; % Window Threshold (actual MB_window_threshold = Max_intensity*1/threshold)
 
 
-idx_frame_start = 500;
-n_frame = 15000;
+idx_frame_start = 10000;
+n_frame = 1000;
 
 % initializing MB struct
 
 MB_log = []; % Current MB
-MB_log.state = 0;
+MB_log.active = 0;
 MB_log.old_pos = zeros(1,2);
 MB_log.new_pos = zeros(1,2);
 MB_log.pred_pos = zeros(1,2);
@@ -97,6 +102,7 @@ MB_log.orientation = 0;
 MB_log.perimeter = 0;
 MB_log.id = 0;
 MB_log.count = 0;
+MB_log.state = zeros(4,1);
 % MB_log = MB;
 
 MB_idx = 0; % Index for each MB
@@ -125,10 +131,10 @@ for idx_frame=idx_frame_start:idx_frame_start+n_frame
     [img_blob_label_global,blob_count_global] = bwlabel(img_global_threshold,4);
     
     % Sort MB's after intensity
-    [~,MB_sort_index] = sort([MB_log.state],'descend');
+    [~,MB_sort_index] = sort([MB_log.active],'descend');
   
     % Connect MB's
-    for i = 1:sum(logical([MB_log.state]))
+    for i = 1:sum(logical([MB_log.active]))
         % Update MB_index
         MB_idx = MB_sort_index(i);
         
@@ -138,17 +144,34 @@ for idx_frame=idx_frame_start:idx_frame_start+n_frame
         
         % Update window coordinates
         if MB_log(MB_idx).age(3) == 1
+            MB_state = zeros(4,1);
             MB_window_coord_search(1,1) = MB_pos_y-MB_window_size_search_new(1);
             MB_window_coord_search(2,1) = MB_pos_y+MB_window_size_search_new(1);
             MB_window_coord_search(1,2) = MB_pos_x-MB_window_size_search_new(2);
             MB_window_coord_search(2,2) = MB_pos_x+MB_window_size_search_new(2);
         else
-            MB_window_coord_search(1,1) = MB_pos_y-MB_window_size_search_existing(1)+MB_log(MB_idx).vel(1);
-            MB_window_coord_search(2,1) = MB_pos_y+MB_window_size_search_existing(1)+MB_log(MB_idx).vel(1);
-            MB_window_coord_search(1,2) = MB_pos_x-MB_window_size_search_existing(2)+MB_log(MB_idx).vel(2);
-            MB_window_coord_search(2,2) = MB_pos_x+MB_window_size_search_existing(2)+MB_log(MB_idx).vel(2);
+            MB_state = MB_log(MB_idx).state(end,:)';
+            if MB_log(MB_idx).age(3) == 2
+                % Init state
+                MB_state = [MB_pos_y, MB_log(MB_idx).vel(end,1), MB_pos_x, MB_log(MB_idx).vel(end,2)]';
+            end
+            % Meausered output
+            MB_output = [MB_pos_y, MB_pos_x]';
+            
+            % Update prediction
+            MB_state = round(F*MB_state+F*L*(MB_output-C*MB_state));
+            
+            MB_window_coord_search(1,1) = MB_state(1)-MB_window_size_search_existing(1);
+            MB_window_coord_search(2,1) = MB_state(1)+MB_window_size_search_existing(1);
+            MB_window_coord_search(1,2) = MB_state(3)-MB_window_size_search_existing(2);
+            MB_window_coord_search(2,2) = MB_state(3)+MB_window_size_search_existing(2);
+            
+            MB_window_coord_search(1,1) = MB_pos_y-MB_window_size_search_existing(1)+MB_log(MB_idx).vel(end,1);
+            MB_window_coord_search(2,1) = MB_pos_y+MB_window_size_search_existing(1)+MB_log(MB_idx).vel(end,1);
+            MB_window_coord_search(1,2) = MB_pos_x-MB_window_size_search_existing(2)+MB_log(MB_idx).vel(end,2);
+            MB_window_coord_search(2,2) = MB_pos_x+MB_window_size_search_existing(2)+MB_log(MB_idx).vel(end,2);
         end
-        
+            
         % Check for out of bounce
         % y_start
         MB_window_out_of_bounce = 0;
@@ -279,11 +302,12 @@ for idx_frame=idx_frame_start:idx_frame_start+n_frame
                 
                 % Updata MB log
                 MB_log(MB_idx).age = MB_log(MB_idx).age + [0 1 1];
-                MB_log(MB_idx).state = max_int;
+                MB_log(MB_idx).active = max_int;
                 MB_log(MB_idx).old_pos(MB_log(MB_idx).age(3),:) = MB_log(MB_idx).new_pos(end,:);
                 MB_log(MB_idx).new_pos(MB_log(MB_idx).age(3),:) = fliplr(round(MB_blob_features.WeightedCentroid)) + [MB_window_coord_search(1,1)-1, MB_window_coord_search(1,2)-1]; %[max_y,max_x];
-                MB_log(MB_idx).pred_pos(MB_log(MB_idx).age(3),:) = [MB_pos_y+MB_log(MB_idx).vel(1),MB_pos_x+MB_log(MB_idx).vel(2);];
+                MB_log(MB_idx).pred_pos(MB_log(MB_idx).age(3),:) = [MB_pos_y+MB_log(MB_idx).vel(end,1),MB_pos_x+MB_log(MB_idx).vel(end,2)];
                 MB_log(MB_idx).vel(MB_log(MB_idx).age(3),:) = MB_log(MB_idx).new_pos(end,:)-MB_log(MB_idx).old_pos(end,:);
+                MB_log(MB_idx).state(MB_log(MB_idx).age(3),:) = MB_state';
                 MB_log(MB_idx).max_int(MB_log(MB_idx).age(3)) = max_int;
                 MB_log(MB_idx).centroid(MB_log(MB_idx).age(3),:) = fliplr(round(MB_blob_features.WeightedCentroid)) + [MB_window_coord_search(1,1)-1, MB_window_coord_search(1,2)-1];
                 MB_log(MB_idx).area(MB_log(MB_idx).age(3)) = MB_blob_features_bw.Area;
@@ -294,11 +318,11 @@ for idx_frame=idx_frame_start:idx_frame_start+n_frame
                 
             else
                 % Remove MB from list
-                MB_log(MB_idx).state = 0;
+                MB_log(MB_idx).active = 0;
             end
         else
             % Remove MB from list
-            MB_log(MB_idx).state = 0;
+            MB_log(MB_idx).active = 0;
         end
         % Check next MB from list
     end
@@ -411,11 +435,12 @@ for idx_frame=idx_frame_start:idx_frame_start+n_frame
             MB_blob_features_bw = regionprops(img_blob_label_window,'Area','Eccentricity','Orientation','Perimeter');
             
             % Updata MB log
-            MB_log(MB_idx).state = max_int;
+            MB_log(MB_idx).active = max_int;
             MB_log(MB_idx).old_pos = [0, 0];
             MB_log(MB_idx).new_pos = fliplr(round(MB_blob_features.WeightedCentroid)) + [MB_window_coord_search(1,1)-1, MB_window_coord_search(1,2)-1];%[max_y, max_x];
             MB_log(MB_idx).pred_pos = [0,0];
             MB_log(MB_idx).vel = [0,0];
+            MB_log(MB_idx).state = zeros(1,4);
             MB_log(MB_idx).id = MB_idx;
             MB_log(MB_idx).max_int = max_int;
             MB_log(MB_idx).centroid = fliplr(round(MB_blob_features.WeightedCentroid)) + [MB_window_coord_search(1,1)-1, MB_window_coord_search(1,2)-1];
@@ -470,12 +495,12 @@ toc
 
 %% Find MB from coordinates
 MB_index_valid = [];
-coord = [365 989];
-for i = 1:size(MB_index_filter_age,2)
-    for j = 1:size(MB_log(MB_index_filter_age(i)).centroid,1)
-        if MB_log(MB_index_filter_age(i)).centroid(j,1) == coord(2) && MB_log(MB_index_filter_age(i)).centroid(j,2) == coord(1); 
-            MB_index_valid = [MB_index_valid MB_index_filter_age(i)]
-            MB_log(MB_index_filter_age(i)).age
+coord = [495 128];
+for i = 1:size(MB_index_list,2)
+    for j = 1:size(MB_log(MB_index_list(i)).centroid,1)
+        if MB_log(MB_index_list(i)).centroid(j,1) == coord(2) && MB_log(MB_index_list(i)).centroid(j,2) == coord(1); 
+            MB_index_valid = [MB_index_valid MB_index_list(i)]
+            MB_log(MB_index_list(i)).age
             break
         end
     end
@@ -484,10 +509,21 @@ end
 
 %% Plot MB path and frequency response
 for i = 1:size(MB_index_valid,2)
-    temp_y = MB_log(MB_index_valid(i)).centroid(:,1);
-    temp_x = MB_log(MB_index_valid(i)).centroid(:,2);
-    figure(); plot(temp_y);
-    figure(); plot(temp_x)
+    temp_y = [MB_log(MB_index_valid(i)).centroid(:,1), MB_log(MB_index_valid(i)).pred_pos(:,1)];
+    temp_x = [MB_log(MB_index_valid(i)).centroid(:,2), MB_log(MB_index_valid(i)).pred_pos(:,2)];
+    figure(); 
+    plot(temp_y(:,1));
+    title('depth');
+    hold on
+    plot(temp_y(1:end,2));
+    plot(MB_log(MB_index_valid(i)).vel(:,1));
+    figure(); 
+    plot(temp_x(:,1))
+    title('lateral');
+    hold oncd ~
+    plot(temp_x(1:end,2))
+    plot(MB_log(MB_index_valid(i)).vel(:,2));
+    
     temp_int = MB_log(MB_index_valid(i)).max_int(:);
     temp_int = sum(MB_log(MB_index_valid(i)).max_int(:))/MB_log(MB_index_valid(i)).age(3)
     %temp_y_fft = fft(temp_y-mean(temp_y));
@@ -557,28 +593,32 @@ figure(); plot(abs(lateral_mov_fft));
 
 %% 
 
-
-figure();
+for i = 32005:32020%13
+figure(7);
 % subplot(1,2,1)
-PI_img = load_img(5000, img_type, folderName, img_resolution, area_of_interest);
-imagesc(lateral_axis*1000,depth_axis*1000,log_compression(abs(PI_img)),[-30 0])
+PI_img = load_img(i, img_type, folderName, img_resolution, area_of_interest);
+imagesc(lateral_axis*1000,depth_axis*1000,log_compression(abs(PI_img)),[-20 0])
+imagesc(log_compression(abs(PI_img)),[-20 0])
+imagesc((abs(PI_img)),[300 2000])
 xlabel('lateral [mm]')
 ylabel('depth [mm]')
-axis image
+% axis image
 colormap(gray(255))
-
-subplot(1,2,2)
-PI_img = load_img(518);
-imagesc(lateral_axis*1000,depth_axis*1000,log_compression(abs(PI_img)),[-30 0])
-xlabel('lateral [mm]')
-ylabel('depth [mm]')
-axis image
-colormap(gray(255))
+pause(0.5)
+end
+% 
+% subplot(1,2,2)
+% PI_img = load_img(518);
+% imagesc(lateral_axis*1000,depth_axis*1000,log_compression(abs(PI_img)),[-30 0])
+% xlabel('lateral [mm]')
+% ylabel('depth [mm]')
+% axis image
+% colormap(gray(255))
 
 %% Make video
 % Set image axis:
 figure(7); 
-PI_img = load_img(5000, img_type, folderName, img_resolution, area_of_interest);;
+PI_img = load_img(10000, img_type, folderName, img_resolution, area_of_interest);
 
 
 outputVideo=VideoWriter('test5_vid');
@@ -588,8 +628,8 @@ mov(1:50)= struct('cdata',[],'colormap',[]);
 pause(0.3)
 frame_timestamp_linecount = [];
 idx = 0;
-img_type = 'PI'
-for idx_frame = 15000:22000
+img_type = 'B-mode'
+for idx_frame = 10201:10053
     idx_frame
     idx = idx + 1;
     [PI_img, time_stamp, line_count] = load_img(idx_frame, img_type, folderName, img_resolution, area_of_interest);
@@ -599,9 +639,9 @@ for idx_frame = 15000:22000
         1/(diff(frame_timestamp_linecount(idx-1:idx,1),1,1)*1e-6);
     end
     
-    figure(7);
+    figure(8);
     imagesc(lateral_axis*1000,depth_axis*1000,log_compression(abs(PI_img)),[-20 0])
-%     imagesc(lateral_axis*1000,depth_axis*1000,abs(PI_img),[0 2000])
+    imagesc(abs(PI_img),[0 -20])
     
 %      imagesc(lateral_axis*1000,depth_axis*1000,abs(PI_img),[100 400])
 %      imagesc(abs(PI_img),[100 400])
@@ -622,6 +662,35 @@ figure(2);plot(framerate)
 
 
 
+%% Plot prediction
 
+figure();
+plot(MB_log(MB_index_valid(1)).state(3:end,1))
+hold on
+plot(MB_log(MB_index_valid(1)).pred_pos(3:end,1))
+plot(MB_log(MB_index_valid(1)).new_pos(3:end,1))
+plot(MB_log(MB_index_valid(1)).state(3:end,1)+3*sqrt(P(1,1)),'k--')
+plot(MB_log(MB_index_valid(1)).state(3:end,1)-3*sqrt(P(1,1)),'k--')
+grid on
+title('Axial');
+legend('kalman','pred','meas','conf');
+% plot([0; MB_log(MB_index_valid(2)).vel(3:end,1)])
 
+figure();
+plot(MB_log(MB_index_valid(1)).state(3:end,3))
+hold on
+plot(MB_log(MB_index_valid(1)).pred_pos(3:end,2))
+plot(MB_log(MB_index_valid(1)).new_pos(3:end,2))
+plot(MB_log(MB_index_valid(1)).state(3:end,3)+3*sqrt(P(3,3)),'k--')
+plot(MB_log(MB_index_valid(1)).state(3:end,3)-3*sqrt(P(3,3)),'k--')
+grid on
+title('Lateral');
+legend('kalman','pred','meas');
+% plot([0; MB_log(MB_index_valid(2)).vel(3:end,2)])
+
+pred_error_axial = sum(abs(MB_log(MB_index_valid(1)).pred_pos(3:end,1)-MB_log(MB_index_valid(1)).new_pos(3:end,1)))
+kalman_error_axial = sum(abs(MB_log(MB_index_valid(1)).state(3:end,1)-MB_log(MB_index_valid(1)).new_pos(3:end,1)))
+
+pred_error_lateral = sum(abs(MB_log(MB_index_valid(1)).pred_pos(3:end,2)-MB_log(MB_index_valid(1)).new_pos(3:end,2)))
+kalman_error_lateral = sum(abs(MB_log(MB_index_valid(1)).state(3:end,3)-MB_log(MB_index_valid(1)).new_pos(3:end,2)))
 

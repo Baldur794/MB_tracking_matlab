@@ -5,6 +5,8 @@ element_pitch = MB_data.elementPitch;
 line_density = MB_data.lineDensity;
 img_size = MB_data.imgSize;
 MB_log = MB_data.MB_log
+img_resolution = MB_data.imgResolution;
+fps = MB_data.fps;
 
 %% Axes for plots
 % img_size = size(load_img(1, img_type, folderName, img_resolution, area_of_interest)); % [y,x]
@@ -18,9 +20,6 @@ depth_axis = (t_axis*c)/2;   %  Values always in MKS :end_line)
 lateral_axis = linspace((area_of_interest.lateral_init-1)*element_pitch/line_density,(area_of_interest.lateral_end-1)*element_pitch/line_density,img_size(2));
 % lateral_axis = linspace((area_of_interest.lateral_init-floor((area_of_interest.lateral_end-(area_of_interest.lateral_init-1))/2))*element_pitch/line_density,(area_of_interest.lateral_end-floor((area_of_interest.lateral_end-(area_of_interest.lateral_init-1))/2))*element_pitch/line_density,img_size_lateral);
 
-% Frame rate
-fps = 163;
-
 %% Convert from pixel to vel in mm/s
 pos_factor_to_mm = img_resolution.lateral_new*1e3;
 vel_factor_to_mm = img_resolution.lateral_new*fps*1e3;
@@ -33,14 +32,14 @@ MB_index_list = 1:size(MB_log_copy,2); % List of indexes for valid MBs
 % Setup conditions
 % Use only MBs found within min and max frame number condition
 MB_frameNumber_min_condition_flag = false;
-MB_frameNumber_min_condition = 550;
-MB_frameNumber_max_condition = 590;
+MB_frameNumber_min_condition = 20000;
+MB_frameNumber_max_condition = 21000;
 MB_index_min_max_frameNumber = [];
 
 % Use only MBs with an age between min and max age condition
 MB_age_min_max_condition_flag = true;
-MB_age_min_condition = 4;
-MB_age_max_condition = 3000;
+MB_age_min_condition = 7;
+MB_age_max_condition = 300;
 MB_index_min_max_age = [];
 
 % Use only MBs with a blob count below max condition
@@ -48,9 +47,10 @@ MB_max_blob_count_condition_flag = false;
 MB_max_blob_count_condition = 20; 
 MB_index_max_blob_count = [];
 
-% Use only MBs with an avg velocity above min condition
+% Use only MBs with an avg velocity between min and max condition
 MB_min_avg_vel_condition_flag = false;
-MB_min_avg_vel_condition = 1;
+MB_min_avg_vel_condition = 3;
+MB_max_avg_vel_condition = 3000;
 MB_index_min_avg_vel = []; 
 
 % Use only MBs located around other MBs with conditions about distance and avg density.
@@ -59,15 +59,15 @@ MB_min_avg_density_condition = 0.5;
 MB_window_size_density_avg = [5 5]; % Window for density condition
 MB_index_min_avg_density = []; 
 
-% Use only MBs for determine inflow/outflow. 0 = not used
-inflow_outflow_center_coord_condition_flag = true;
+% Use only MBs for determine inflow/outflow.
+inflow_outflow_center_coord_condition_flag = false;
 inflow_outflow_const = 1; % Towards center coord set -1. Away set 1.
-inflow_outflow_center_coord_condition = [170 1000]; % [y,x]
+inflow_outflow_center_coord_condition = [110 1000]; % [y,x] in 
 MB_index_inflow_outflow = []; % Filtered list of MBs satisfying conditions
 
 % Smooth velocity/direction for each MB
-smooth_vel_dir_flag = false;
-smooth_vel_dir_length = 50; % Number of MBs used for smoothing
+smooth_vel_dir_flag = true;
+smooth_vel_dir_length = 10; % Number of MBs used for smoothing
 
 %
 % Check frame condition
@@ -118,7 +118,7 @@ if MB_min_avg_vel_condition_flag
         MB_index = MB_index_list(i);
         avg_vel = sqrt((MB_log_copy(MB_index).centroid(1,1)-MB_log_copy(MB_index).centroid(end,1))^2+(MB_log_copy(MB_index).centroid(1,2)-MB_log_copy(MB_index).centroid(end,2))^2)/MB_log_copy(MB_index).age(3);      
         % Check condition
-        if (avg_vel < MB_min_avg_vel_condition)
+        if (avg_vel < MB_min_avg_vel_condition || avg_vel > MB_max_avg_vel_condition)
             MB_index_list(i) = 0;
         end
     end
@@ -239,13 +239,9 @@ MB_XData = [];
 MB_YData = [];
 MB_CData = [];
 
-i_end = 1;
 for i = 1:size(MB_index_list,2)
     MB_index = MB_index_list(i);
-    
-    i_start = i_end;
-    i_end = i_end+MB_log_copy(MB_index).age(3)-3;
-    
+
     MB_XData = [MB_XData MB_log_copy(MB_index).centroid(2:end-1,2)'];%scatter(vel_abs_img_list_x(i), vel_abs_img_list_y(i));
     MB_YData = [MB_YData MB_log_copy(MB_index).centroid(2:end-1,1)'];
     MB_CData = [MB_CData; dir_color(floor(mod(atan2(MB_log_copy(MB_index).vel(2:end,1),MB_log_copy(MB_index).vel(2:end,2))+5/2*pi,2*pi)/(2*pi)*63+1),:)];% setting colors of individual dots depending on direction
@@ -270,6 +266,7 @@ set(gca, 'DataAspectRatio',[1 1 1]) % set data aspect ratio in zoom box
 set(gca, 'PlotBoxAspectRatio',[1 1 1])
 set(gca, 'YDir','reverse'); % reverse y-axis
 set(gca, 'Box','on');
+grid on
 xlim([0 size(lateral_axis,2)]);
 ylim([0 size(depth_axis,2)]);
 
@@ -383,12 +380,8 @@ MB_XData = [];
 MB_YData = [];
 MB_VelData = [];
 
-i_end = 1;
 for i = 1:size(MB_index_list,2)
     MB_index = MB_index_list(i);
-    
-    i_start = i_end;
-    i_end = i_end+MB_log_copy(MB_index).age(3)-3;
     
     MB_XData = [MB_XData MB_log_copy(MB_index).centroid(2:end-1,2)'];%scatter(vel_abs_img_list_x(i), vel_abs_img_list_y(i));
     MB_YData = [MB_YData MB_log_copy(MB_index).centroid(2:end-1,1)'];
@@ -396,8 +389,8 @@ for i = 1:size(MB_index_list,2)
 end
 
 % Max and min value for colormap
-val_range_max = 40;
-val_range_min = 5;
+val_range_max = 50;
+val_range_min = 0;
 
 MB_VelData = MB_VelData * vel_factor_to_mm;
 MB_VelData(find(MB_VelData > val_range_max)) = val_range_max; 
@@ -410,7 +403,7 @@ fig.YData = MB_YData;
 fig.CData = MB_CData;
 
 % Scatterplot settings
-set(fig,'SizeData', 20);%0.5); % size of dots
+set(fig,'SizeData', 10);%0.5); % size of dots
 set(fig,'MarkerFacecolor','flat'); % appearance of dots
 xlabel('Lateral [mm]'); ylabel('Axial [mm]'); % title('Micro-Bubble image');
 set(gca,'Xtick',linspace(0,size(lateral_axis,2),6)); set(gca, 'XTickLabel',linspace(round(lateral_axis(1)*1000),round(lateral_axis(end)*1000),6));
@@ -421,6 +414,7 @@ set(gca, 'YDir','reverse'); % reverse y-axis
 set(gca, 'Box','on');
 xlim([0 size(lateral_axis,2)]);
 ylim([0 size(depth_axis,2)]);
+grid on
 
 %Colorbar prop
 ch = colorbar;
@@ -432,5 +426,30 @@ set(ch,'TickLabels',fliplr(linspace(val_range_min, val_range_max,6)));
 colormap(flipud(vel_color));
 ylabel(ch,'Velocity [mm/s]')
 
+%% Plot Streamlines
 
+% Make figure handle
+fh = figure; clf;
 
+% set position on screen
+set(fh,'position',[-1850 570 560 420]);
+
+MB_XData = [];
+MB_YData = [];
+MB_VelData = [];
+
+for i = 1:size(MB_index_list,2)
+    MB_index = MB_index_list(i);
+plot(smooth(MB_log_copy(MB_index).centroid(2:end-1,2)'), smooth(MB_log_copy(MB_index).centroid(2:end-1,1)'), 'b','LineWidth',0.1);
+%     plot(MB_log_copy(MB_index).centroid(2:end-1,2)', MB_log_copy(MB_index).centroid(2:end-1,1)', 'b');
+    hold on
+end
+xlabel('Lateral [mm]'); ylabel('Axial [mm]'); % title('Micro-Bubble image');
+set(gca,'Xtick',linspace(0,size(lateral_axis,2),6)); set(gca, 'XTickLabel',linspace(round(lateral_axis(1)*1000),round(lateral_axis(end)*1000),6));
+set(gca,'Ytick',linspace(0,size(depth_axis,2),6)); set(gca, 'YTickLabel',linspace(round(depth_axis(1)*1000),round(depth_axis(end)*1000),6));
+set(gca, 'DataAspectRatio',[1 1 1]) % set data aspect ratio in zoom box
+set(gca, 'PlotBoxAspectRatio',[1 1 1])
+set(gca, 'YDir','reverse'); % reverse y-axis
+set(gca, 'Box','on');
+xlim([0 size(lateral_axis,2)]);
+ylim([0 size(depth_axis,2)]);
